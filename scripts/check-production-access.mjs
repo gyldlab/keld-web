@@ -65,6 +65,9 @@ try {
     "/brand/hero-physical-v1/realtime-config.json",
     "/brand/GYLDLAB.svg",
     "/brand/keld-symbol-white.svg",
+    "/brand/social/github.svg",
+    "/brand/social/x.svg",
+    "/brand/social/linkedin.png",
     "/brand/stone-materials/seaside_rock/color-2048.webp",
   ]) {
     const response = await responseFor(route);

@@ -1,6 +1,21 @@
 import type { CameraSpec, SceneConfig } from "@/components/hero/_types/scene-runtime";
-import type { Vec3 } from "@/components/hero/editor/scene-preset";
+import type { ScenePreset, Vec3 } from "@/components/hero/editor/scene-preset";
 import { isStoneId } from "@/components/hero/editor/stone-catalog";
+
+/** Only physical scene changes require a new environment reflection capture. */
+export function reflectionSignature(value: ScenePreset): string {
+  return JSON.stringify({
+    lights: value.lights,
+    materials: value.materials,
+    objects: value.objects,
+    shadows: value.shadows,
+    stone: value.stone,
+    background: value.atmosphere.background,
+    fogColor: value.atmosphere.fogColor,
+    fogDensity: value.atmosphere.fogDensity,
+    hemisphereIntensity: value.atmosphere.hemisphereIntensity,
+  });
+}
 
 export function readConfig(raw: unknown): SceneConfig {
   const config = raw as SceneConfig;

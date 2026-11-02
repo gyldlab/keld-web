@@ -1,4 +1,3 @@
-import type { Material } from "three";
 import {
   AgXToneMapping,
   type AnimationAction,
@@ -18,7 +17,6 @@ import {
   Scene,
   SpotLight,
   SRGBColorSpace,
-  Texture,
   Vector2,
   Vector3,
   WebGLRenderer,
@@ -31,53 +29,25 @@ import type { Reflector } from "three/addons/objects/Reflector.js";
 import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
-import type { SceneController } from "@/components/hero/_types/scene-runtime";
+import type { SceneController, SceneRuntimeOptions } from "@/components/hero/_types/scene-runtime";
+import { AtmospherePass } from "@/components/hero/atmosphere-pass";
 import { createDeckReflection } from "@/components/hero/deck-reflection";
 import type { SceneTuner } from "@/components/hero/editor/scene-bindings";
-import type { ScenePreset, Vec3 } from "@/components/hero/editor/scene-preset";
+import type { Vec3 } from "@/components/hero/editor/scene-preset";
+import { createAntialiasPass } from "@/components/hero/scene-antialias";
 import { HERO_ASSET_ROOT, HERO_COMPACT_QUERY } from "@/components/hero/scene-assets";
-import { readConfig } from "@/components/hero/scene-config";
+import { readConfig, reflectionSignature } from "@/components/hero/scene-config";
+import { createSceneMotion } from "@/components/hero/scene-motion";
+import { disposeModel, projectSocialLinks } from "@/components/hero/scene-resources";
+import { createSocialPlinths } from "@/components/hero/social-plinths";
 export type { SceneConfig, SceneController } from "@/components/hero/_types/scene-runtime";
 
-type Options = {
-  signal: AbortSignal;
-  onPlaying(value: boolean): void;
-  onProgress?(value: number): void;
-  onFailure(): void;
-  editor?: boolean;
-  onTuningChange?: (preset: ScenePreset) => void;
-  restoreTuning?: (defaults: ScenePreset) => unknown;
-};
-
-/** Dispose each shared resource only once, including image bitmaps from GLTFLoader. */
-function disposeModel(root: Object3D) {
-  const geometries = new Set<Mesh["geometry"]>();
-  const materials = new Set<Material>();
-  const textures = new Set<Texture>();
-  root.traverse((object) => {
-    if (!(object instanceof Mesh)) return;
-    geometries.add(object.geometry);
-    const list = Array.isArray(object.material) ? object.material : [object.material];
-    list.forEach((material) => {
-      materials.add(material);
-      Object.values(material).forEach((value: unknown) => {
-        if (value instanceof Texture) textures.add(value);
-      });
-    });
-  });
-  geometries.forEach((geometry) => geometry.dispose());
-  materials.forEach((material) => material.dispose());
-  textures.forEach((texture) => {
-    if (typeof ImageBitmap !== "undefined" && texture.image instanceof ImageBitmap)
-      texture.image.close();
-    texture.dispose();
-  });
-}
-
-export async function createScene(host: HTMLElement, options: Options): Promise<SceneController> {
+export async function createScene(
+  host: HTMLElement,
+  options: SceneRuntimeOptions,
+): Promise<SceneController> {
   const { signal, onPlaying, onProgress, onFailure } = options;
   signal.throwIfAborted();
   const root = HERO_ASSET_ROOT;
@@ -96,6 +66,9 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
   let gltf: GLTF | undefined;
   let renderer: WebGLRenderer | undefined;
   let composer: EffectComposer | undefined;
+  let atmosphere: AtmospherePass | undefined;
+  let antialias: ReturnType<typeof createAntialiasPass> | undefined;
+  let socials: Awaited<ReturnType<typeof createSocialPlinths>> | undefined;
   let bloom: UnrealBloomPass | undefined;
   let output: OutputPass | undefined;
   let defocus: BokehPass | undefined;
@@ -109,12 +82,10 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
   let reflector: Reflector | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let mixer: AnimationMixer | undefined;
-  let frame = 0;
   let disposed = false;
   let visible = true;
   let playing = false;
   let elapsed = 0;
-  let previousTime = 0;
   let reportedProgress = -1;
   let energy = true;
   let shaderFailed = false;
@@ -124,6 +95,23 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
   let drawCount = 0;
   let reflectionCount = 0;
   let reflectionDirty = false;
+  let settleScene: (() => void) | undefined;
+  let advanceScene: ((delta: number) => void) | undefined;
+  let drawScene: ((changed: boolean) => void) | undefined;
+  const motion = createSceneMotion(host, {
+    atmosphere: () => atmosphere,
+    isPlaying: () => playing,
+    advanceAnimation: (delta) => advanceScene?.(delta),
+    draw: (changed) => drawScene?.(changed),
+    enabledChanged: (enabled) => {
+      options.onMotionChange?.(enabled);
+      if (!enabled) {
+        playing = false;
+        settleScene?.();
+        onPlaying(false);
+      }
+    },
+  });
   const actions: AnimationAction[] = [];
   const scene = new Scene();
   const camera = new PerspectiveCamera(35, 1, 0.1, 100);
@@ -133,9 +121,13 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
   const dispose = () => {
     if (disposed) return;
     disposed = true;
-    cancelAnimationFrame(frame);
+    motion.dispose();
     clearTimeout(reflectionTimer);
     resizeObserver?.disconnect();
+    projectSocialLinks(options.socialHost, socials?.anchors, camera, 0, 0, false);
+    socials?.dispose();
+    atmosphere?.dispose();
+    antialias?.dispose();
     renderer?.domElement.removeEventListener("webglcontextlost", contextLost);
     signal.removeEventListener("abort", dispose);
     orbit?.dispose();
@@ -220,12 +212,19 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
     renderer.shadowMap.autoUpdate = false;
     renderer.shadowMap.needsUpdate = true;
     host.dataset.renderMode = "raster";
-    renderer.debug.onShaderError = () => {
+    renderer.debug.onShaderError = (gl, _program, vertex, fragment) => {
       shaderFailed = true;
+      console.error(
+        "KELD shader compilation failed.",
+        gl.getShaderInfoLog(vertex),
+        gl.getShaderInfoLog(fragment),
+      );
     };
     renderer.domElement.setAttribute("aria-hidden", "true");
     renderer.domElement.addEventListener("webglcontextlost", contextLost);
     host.appendChild(renderer.domElement);
+    socials = await createSocialPlinths(gltf.scene, signal);
+    signal.throwIfAborted();
 
     scene.environmentIntensity = config.environmentIntensity ?? 0.18;
     const hemisphere = new HemisphereLight(0xabc8e0, 0x12141b, config.hemisphereIntensity ?? 0.12);
@@ -372,17 +371,20 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       }, 160);
     }
 
-    // Canvas antialiasing does not smooth an offscreen post-processing target.
-    // Use bounded multisampling on the composer target instead.
+    // The atmosphere's cached scene target owns antialiasing and depth. The
+    // full-screen postprocess buffers need neither duplicate MSAA nor depth.
     const renderTarget = new WebGLRenderTarget(1, 1, {
       type: HalfFloatType,
-      samples: Math.min(
-        matchMedia(HERO_COMPACT_QUERY).matches ? 2 : 4,
-        renderer.capabilities.maxSamples,
-      ),
+      depthBuffer: false,
     });
     composer = new EffectComposer(renderer, renderTarget);
-    composer.addPass(new RenderPass(scene, camera));
+    atmosphere = new AtmospherePass(
+      scene,
+      camera,
+      windowLight instanceof SpotLight ? windowLight : undefined,
+      Math.min(2, renderer.capabilities.maxSamples),
+    );
+    composer.addPass(atmosphere);
     // Mild depth-aware background separation, not decorative bokeh circles.
     // Focus is camera-forward distance, NOT Euclidean distance or an f-stop.
     // https://threejs.org/docs/pages/BokehPass.html
@@ -422,6 +424,8 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
     composer.addPass(bloom);
     output = new OutputPass();
     composer.addPass(output);
+    antialias = createAntialiasPass();
+    composer.addPass(antialias);
 
     // The opt-in scene editor adds tuning wrappers and orbit controls. Source
     // meshes and animation clips remain owned by the imported glTF.
@@ -429,6 +433,7 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
     if (process.env.NODE_ENV === "development" && options.editor) {
       const { createSceneTuner } = await import("@/components/hero/editor/scene-bindings");
       tuner = createSceneTuner({
+        atmospherePass: atmosphere,
         source: config,
         scene,
         model: gltf,
@@ -463,6 +468,9 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
         entry.enabled = true;
       });
       mixer.setTime(seconds);
+      const reveal = Math.max(0, Math.min(1, seconds / config.durationSeconds));
+      atmosphere?.setReveal(reveal);
+      socials?.setReveal(Math.max(0, Math.min(1, (reveal - 0.55) / 0.4)));
       if (renderer) renderer.shadowMap.needsUpdate = true;
       if (finishLight && sweepSpec) {
         finishLight.position
@@ -474,18 +482,34 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
           : 0;
       }
       const progress = Math.round((seconds / config.durationSeconds) * 200) / 200;
+      host.dataset.assemblyProgress = String(progress);
       if (onProgress && progress !== reportedProgress) {
         reportedProgress = progress;
         onProgress(progress);
       }
     }
 
-    function draw() {
+    function draw(sceneChanged = true) {
       if (disposed || !visible) return;
       try {
+        if (sceneChanged) atmosphere?.invalidate();
         composer?.render();
         if (shaderFailed) throw new Error("WebGL shader compilation failed.");
         host.dataset.renderFrames = String(++drawCount);
+        host.dataset.fogTime = (atmosphere?.time ?? 0).toFixed(3);
+        host.dataset.fogInteraction = (atmosphere?.getPointerStrength() ?? 0).toFixed(3);
+        host.dataset.sceneCaptures = String(atmosphere?.sceneCaptures ?? 0);
+        host.dataset.fogResolution = atmosphere?.getFogSize() ?? "none";
+        host.dataset.fogQuality = String(atmosphere?.getQuality() ?? 0);
+        if (sceneChanged)
+          projectSocialLinks(
+            options.socialHost,
+            socials?.anchors,
+            camera,
+            viewportWidth,
+            viewportHeight,
+            elapsed / config.durationSeconds >= 0.8,
+          );
       } catch (error) {
         onFailure();
         dispose();
@@ -493,25 +517,20 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       }
     }
 
-    function tick(time: number) {
-      frame = 0;
-      if (disposed || !visible || !playing) return;
-      if (previousTime)
-        elapsed = Math.min(config.durationSeconds, elapsed + (time - previousTime) / 1000);
-      previousTime = time;
+    advanceScene = (delta) => {
+      elapsed = Math.min(config.durationSeconds, elapsed + delta * 0.7);
       sample(elapsed);
-      draw();
       if (elapsed >= config.durationSeconds) {
         playing = false;
         onPlaying(false);
-        return;
       }
-      if (!disposed) frame = requestAnimationFrame(tick);
-    }
-
-    function requestFrame() {
-      if (!frame && playing && visible && !disposed) frame = requestAnimationFrame(tick);
-    }
+    };
+    drawScene = draw;
+    settleScene = () => {
+      elapsed = config.durationSeconds;
+      sample(elapsed);
+      draw();
+    };
 
     function updateCamera(width: number, height: number, mobile: boolean) {
       const authored = mobile ? config.cameras.mobile : config.cameras.desktop;
@@ -588,6 +607,7 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       viewportWidth = width;
       viewportHeight = height;
       const mobile = matchMedia(HERO_COMPACT_QUERY).matches;
+      atmosphere?.setCompact(mobile);
       updateCamera(width, height, mobile);
       const pixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
       renderer.setPixelRatio(pixelRatio);
@@ -600,9 +620,11 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       draw();
     }
 
-    // Initial image uses the final pose; the intro starts only after the canvas is ready.
-    elapsed = config.durationSeconds;
-    sample(config.durationSeconds);
+    // Reduced motion/data saver begin settled; all other visitors get one short
+    // authored assembly followed by slow ambient fog, never a looping intro.
+    elapsed = motion.enabled ? 0 : config.durationSeconds;
+    playing = motion.enabled;
+    sample(elapsed);
     syncWindowSource();
     captureEnvironment();
     resize();
@@ -611,6 +633,7 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
     resizeObserver.observe(host);
     signal.addEventListener("abort", dispose, { once: true });
     signal.throwIfAborted();
+    motion.start();
 
     // eslint-disable-next-line no-restricted-properties -- Build-time development-only branch.
     if (process.env.NODE_ENV === "development" && options.editor && tuner) {
@@ -652,9 +675,9 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       if (disposed) return;
       if (elapsed >= config.durationSeconds) elapsed = 0;
       playing = true;
-      previousTime = 0;
+      motion.cancel();
       onPlaying(true);
-      requestFrame();
+      motion.request();
     };
 
     return {
@@ -663,10 +686,9 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       pause() {
         if (disposed) return;
         playing = false;
-        previousTime = 0;
-        cancelAnimationFrame(frame);
-        frame = 0;
+        motion.cancel();
         onPlaying(false);
+        motion.request();
       },
       replay() {
         if (disposed) return;
@@ -678,13 +700,12 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
       seek(progress) {
         if (disposed) return;
         playing = false;
-        previousTime = 0;
-        cancelAnimationFrame(frame);
-        frame = 0;
+        motion.cancel();
         elapsed = Math.max(0, Math.min(1, progress)) * config.durationSeconds;
         sample(elapsed);
         draw();
         onPlaying(false);
+        motion.request();
       },
       setEnergy(value) {
         if (disposed) return;
@@ -693,17 +714,17 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
         draw();
         scheduleReflectionUpdate();
       },
+      getMotion: () => motion.enabled,
+      setMotion(value) {
+        motion.setEnabled(value);
+      },
       setVisible(value) {
         if (disposed) return;
         visible = value;
-        previousTime = 0;
-        if (!visible) {
-          cancelAnimationFrame(frame);
-          frame = 0;
-        } else {
+        motion.setVisible(value);
+        if (visible) {
           if (reflectionDirty) scheduleReflectionUpdate();
           draw();
-          requestFrame();
         }
       },
       getTuning: () => tuner?.get() ?? null,
@@ -730,6 +751,7 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
           composer.setSize(width, height);
           syncDepthOfField(width, height, mobile, true);
           sample(config.durationSeconds);
+          atmosphere?.invalidate();
           composer.render();
           return renderer.domElement.toDataURL("image/png");
         } finally {
@@ -762,19 +784,7 @@ export async function createScene(host: HTMLElement, options: Options): Promise<
         );
         sample(elapsed);
         draw();
-        const reflected = (value: ScenePreset) =>
-          JSON.stringify({
-            lights: value.lights,
-            materials: value.materials,
-            objects: value.objects,
-            shadows: value.shadows,
-            stone: value.stone,
-            background: value.atmosphere.background,
-            fogColor: value.atmosphere.fogColor,
-            fogDensity: value.atmosphere.fogDensity,
-            hemisphereIntensity: value.atmosphere.hemisphereIntensity,
-          });
-        if (reflected(before) !== reflected(after)) scheduleReflectionUpdate();
+        if (reflectionSignature(before) !== reflectionSignature(after)) scheduleReflectionUpdate();
         return true;
       },
       dispose,

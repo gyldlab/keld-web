@@ -68,6 +68,7 @@ export type SceneController = {
   dispose(): void;
   getDefaultTuning(): ScenePreset | null;
   getDenoising?(): boolean;
+  getMotion?(): boolean;
   getSampleBudget?(): number;
   getTuning(): ScenePreset | null;
   pause(): void;
@@ -77,6 +78,19 @@ export type SceneController = {
   seek(progress: number): void;
   setDenoising?(value: boolean): void;
   setEnergy(value: boolean): void;
+  setMotion?(value: boolean): void;
   setSampleBudget?(value: number): void;
   setVisible(value: boolean): void;
+};
+
+export type SceneRuntimeOptions = {
+  editor?: boolean;
+  onFailure(): void;
+  onMotionChange?: (enabled: boolean) => void;
+  onPlaying(value: boolean): void;
+  onProgress?(value: number): void;
+  onTuningChange?: (preset: ScenePreset) => void;
+  restoreTuning?: (defaults: ScenePreset) => unknown;
+  signal: AbortSignal;
+  socialHost?: HTMLElement;
 };

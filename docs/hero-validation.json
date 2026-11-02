@@ -1,0 +1,241 @@
+{
+  "recordedAt": "2026-11-02T18:06:12.766Z",
+  "scope": "Local Chromium on Apple M4; compact viewports are emulated, not physical phones.",
+  "suites": {
+    "productionBrowser": {
+      "origin": "http://127.0.0.1:3015",
+      "checkedAt": "2026-11-02T18:03:41.373Z",
+      "errors": [],
+      "checks": {
+        "productionClientHasNoSceneLab": true,
+        "cachedSceneAndAnimatedFog": true,
+        "pointerRespondsAndRelaxes": true,
+        "keyboardSocialLinks": true,
+        "pauseStopsRendering": true,
+        "offscreenStopsRendering": true,
+        "liveReducedMotionPreference": true,
+        "mobileLayoutAndFog": true,
+        "smallScreenNoOverflow": true
+      },
+      "initial": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "0.095",
+        "reflectionCaptures": "1",
+        "renderFrames": "11",
+        "fogTime": "0.217",
+        "fogInteraction": "0.000",
+        "sceneCaptures": "11",
+        "fogResolution": "648x405",
+        "fogQuality": "1",
+        "atmosphereMotion": "running"
+      },
+      "graphics": {
+        "webgl2": true,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+        "devicePixelRatio": 1
+      },
+      "desktop": {
+        "before": {
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "1",
+          "reflectionCaptures": "1",
+          "renderFrames": "149",
+          "fogTime": "2.733",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "135",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "atmosphereMotion": "running"
+        },
+        "after": {
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "1",
+          "reflectionCaptures": "1",
+          "renderFrames": "216",
+          "fogTime": "4.966",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "135",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "atmosphereMotion": "running"
+        },
+        "measuredFps": 30.289330922242314
+      },
+      "pointerActive": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "1",
+        "reflectionCaptures": "1",
+        "renderFrames": "229",
+        "fogTime": "5.400",
+        "fogInteraction": "0.878",
+        "sceneCaptures": "135",
+        "fogResolution": "648x405",
+        "fogQuality": "1",
+        "atmosphereMotion": "running"
+      },
+      "pointerRest": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "1",
+        "reflectionCaptures": "1",
+        "renderFrames": "308",
+        "fogTime": "8.033",
+        "fogInteraction": "0.040",
+        "sceneCaptures": "135",
+        "fogResolution": "648x405",
+        "fogQuality": "1",
+        "atmosphereMotion": "running"
+      },
+      "socialLinks": [
+        {
+          "id": "github",
+          "href": "https://github.com/gyldlab/keld",
+          "visible": "visible",
+          "rect": {
+            "x": 869.8292236328125,
+            "y": 618.44287109375,
+            "width": 96.3125,
+            "height": 97.03125,
+            "top": 618.44287109375,
+            "right": 966.1417236328125,
+            "bottom": 715.47412109375,
+            "left": 869.8292236328125
+          },
+          "tabIndex": 0
+        },
+        {
+          "id": "x",
+          "href": "https://x.com/GYLDLAB",
+          "visible": "visible",
+          "rect": {
+            "x": 1011.82763671875,
+            "y": 623.845703125,
+            "width": 99.703125,
+            "height": 99.8125,
+            "top": 623.845703125,
+            "right": 1111.53076171875,
+            "bottom": 723.658203125,
+            "left": 1011.82763671875
+          },
+          "tabIndex": 0
+        },
+        {
+          "id": "linkedin",
+          "href": "https://www.linkedin.com/company/gyldlab/",
+          "visible": "visible",
+          "rect": {
+            "x": 1161.91259765625,
+            "y": 629.5517578125,
+            "width": 103.328125,
+            "height": 102.765625,
+            "top": 629.5517578125,
+            "right": 1265.24072265625,
+            "bottom": 732.3173828125,
+            "left": 1161.91259765625
+          },
+          "tabIndex": 0
+        }
+      ],
+      "mobile": {
+        "before": {
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "1",
+          "reflectionCaptures": "1",
+          "renderFrames": "374",
+          "fogTime": "10.183",
+          "fogInteraction": "0.001",
+          "sceneCaptures": "139",
+          "fogResolution": "195x232",
+          "fogQuality": "1",
+          "atmosphereMotion": "running"
+        },
+        "after": {
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "1",
+          "reflectionCaptures": "1",
+          "renderFrames": "427",
+          "fogTime": "12.383",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "139",
+          "fogResolution": "195x232",
+          "fogQuality": "1",
+          "atmosphereMotion": "running"
+        },
+        "measuredFps": 23.960216998191683
+      },
+      "mobileLinks": [
+        {
+          "id": "github",
+          "visible": "visible",
+          "rect": {
+            "x": 152.27804565429688,
+            "y": 419.7350769042969,
+            "width": 48,
+            "height": 48,
+            "top": 419.7350769042969,
+            "right": 200.27804565429688,
+            "bottom": 467.7350769042969,
+            "left": 152.27804565429688
+          }
+        },
+        {
+          "id": "x",
+          "visible": "visible",
+          "rect": {
+            "x": 209.0357666015625,
+            "y": 426.64837646484375,
+            "width": 48,
+            "height": 48,
+            "top": 426.64837646484375,
+            "right": 257.0357666015625,
+            "bottom": 474.64837646484375,
+            "left": 209.0357666015625
+          }
+        },
+        {
+          "id": "linkedin",
+          "visible": "visible",
+          "rect": {
+            "x": 268.5196838378906,
+            "y": 433.8939514160156,
+            "width": 48,
+            "height": 48,
+            "top": 433.8939514160156,
+            "right": 316.5196838378906,
+            "bottom": 481.8939514160156,
+            "left": 268.5196838378906
+          }
+        }
+      ],
+      "status": "pass"
+    },
+    "developmentEditor": {
+      "checkedAt": "2026-11-02T17:57:52.027Z",
+      "errors": [],
+      "checks": {
+        "homepageEditorAndLink": true,
+        "fogControlsApplyAndSave": true,
+        "exportIncludesMovingFog": true,
+        "legacyPresetAccepted": true,
+        "/lab/motion": true,
+        "/lab/physical": true
+      },
+      "status": "pass"
+    },
+    "recovery": {
+      "checks": {
+        "dataSaverStartsSettledAndStatic": true,
+        "explicitResumeWorks": true,
+        "contextLossRetryUsesOneCanvas": true,
+        "developmentEditorRestoredAfterProductionCheck": true
+      },
+      "status": "pass"
+    }
+  }
+}

@@ -26,10 +26,12 @@ export function CinematicHero({
   // eslint-disable-next-line no-restricted-properties -- Next.js replaces this at build time.
   const studioEnabled = process.env.NODE_ENV === "development" && (editor || controls);
   const host = useRef<HTMLDivElement>(null);
+  const socialHost = useRef<HTMLElement>(null);
   const syncInspector = useRef<((preset: ScenePreset) => void) | null>(null);
   const [controller, setController] = useState<SceneController | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [motion, setMotion] = useState(false);
 
   useEffect(() => {
     if (!host.current) return;
@@ -65,6 +67,8 @@ export function CinematicHero({
           editor: studioEnabled,
           onFailure: fail,
           onPlaying: () => undefined,
+          onMotionChange: setMotion,
+          socialHost: socialHost.current ?? undefined,
           restoreTuning: studioEnabled
             ? (defaults) => {
                 try {
@@ -108,8 +112,50 @@ export function CinematicHero({
         data-ready={!!controller && !failed}
         ref={host}
         role="img"
-        aria-label="Live 3D KELD sculpture with physical lighting, reflections and shadows."
+        aria-label="Live 3D KELD sculpture assembling on stone, with drifting interactive fog, lighting and shadows."
       />
+      <nav
+        ref={socialHost}
+        aria-label="KELD and GYLDLAB social links"
+        className="pointer-events-none absolute inset-0 z-3"
+      >
+        {[
+          { id: "github", name: "KELD on GitHub", href: "https://github.com/gyldlab/keld" },
+          { id: "x", name: "GYLDLAB on X (Twitter)", href: "https://x.com/GYLDLAB" },
+          {
+            id: "linkedin",
+            name: "GYLDLAB on LinkedIn",
+            href: "https://www.linkedin.com/company/gyldlab/",
+          },
+        ].map((social) => (
+          <a
+            key={social.id}
+            data-social={social.id}
+            href={social.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={social.name}
+            aria-label={`${social.name} (opens in a new tab)`}
+            tabIndex={-1}
+            style={{ visibility: "hidden" }}
+            className="pointer-events-auto absolute top-0 left-0 block size-12 rounded-lg outline-offset-4 transition-shadow hover:shadow-[0_0_24px_#b2dbef22] focus-visible:outline-2 focus-visible:outline-[#d6efff] motion-reduce:transition-none"
+          >
+            <span className="sr-only">{social.name}</span>
+          </a>
+        ))}
+      </nav>
+      {controller && !failed && (
+        <button
+          type="button"
+          aria-label={motion ? "Pause scene animation" : "Resume scene animation"}
+          aria-pressed={!motion}
+          onClick={() => controller.setMotion?.(!motion)}
+          className="pointer-events-auto absolute top-20 right-4 bottom-auto z-4 flex min-h-11 items-center gap-2.5 rounded-full border border-white/15 bg-[#07101b]/75 px-4 text-[10px] tracking-[0.16em] text-[#b8cddd] uppercase backdrop-blur-sm transition-colors hover:border-white/40 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#c6e8ff] motion-reduce:transition-none min-[901px]:top-auto min-[901px]:right-14 min-[901px]:bottom-20"
+        >
+          <span aria-hidden="true">{motion ? "Ⅱ" : "▷"}</span>
+          {motion ? "Pause motion" : "Resume motion"}
+        </button>
+      )}
       {!controller && (
         <div className="scene-launcher">
           <span role="status">

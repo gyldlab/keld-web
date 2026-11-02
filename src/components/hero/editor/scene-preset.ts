@@ -95,6 +95,10 @@ export function parsePreset(input: unknown, baseline: ScenePreset): ScenePreset 
     fail("preset.version/asset");
   }
   const camera = record(p.camera, ["position", "target", "fov"], "camera");
+  const hasMovingFog =
+    !!p.atmosphere &&
+    typeof p.atmosphere === "object" &&
+    Object.prototype.hasOwnProperty.call(p.atmosphere, "movingFog");
   const at = record(
     p.atmosphere,
     [
@@ -104,9 +108,13 @@ export function parsePreset(input: unknown, baseline: ScenePreset): ScenePreset 
       "hemisphereIntensity",
       "fogColor",
       "fogDensity",
+      ...(hasMovingFog ? ["movingFog"] : []),
     ],
     "atmosphere",
   );
+  const moving = hasMovingFog
+    ? record(at.movingFog, ["color", "cursorStrength", "density", "speed"], "atmosphere.movingFog")
+    : baseline.atmosphere.movingFog;
   const sh = record(
     p.shadows,
     ["enabled", "opacity", "radius", "bias", "normalBias", "mapSize"],
@@ -196,6 +204,12 @@ export function parsePreset(input: unknown, baseline: ScenePreset): ScenePreset 
       hemisphereIntensity: number(at.hemisphereIntensity, 0, 2, "atmosphere.hemisphereIntensity"),
       fogColor: color(at.fogColor, "atmosphere.fogColor"),
       fogDensity: number(at.fogDensity, 0, 0.05, "atmosphere.fogDensity"),
+      movingFog: {
+        color: color(moving.color, "atmosphere.movingFog.color"),
+        cursorStrength: number(moving.cursorStrength, 0, 2, "atmosphere.movingFog.cursorStrength"),
+        density: number(moving.density, 0, 0.25, "atmosphere.movingFog.density"),
+        speed: number(moving.speed, 0, 3, "atmosphere.movingFog.speed"),
+      },
     },
     shadows: {
       enabled: boolean(sh.enabled, "shadows.enabled"),

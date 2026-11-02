@@ -15,6 +15,7 @@ import type { GLTF } from "three/addons/loaders/GLTFLoader.js";
 import type { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import type { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+import { type AtmospherePass, DEFAULT_ATMOSPHERE } from "@/components/hero/atmosphere-pass";
 import {
   copyPreset,
   type MaterialTuning,
@@ -25,6 +26,7 @@ import { createStoneTextures } from "@/components/hero/editor/stone-textures";
 import type { SceneConfig } from "@/components/hero/scene-runtime";
 
 type Bindings = {
+  atmospherePass?: AtmospherePass;
   source: SceneConfig;
   scene: Scene;
   model: GLTF;
@@ -102,6 +104,7 @@ function offsetParent(model: GLTF, objectName: string): Group {
 
 /** Holds direct Three.js bindings, separate from React/lil-gui/preset IO. */
 export function createSceneTuner({
+  atmospherePass,
   source,
   scene,
   model,
@@ -142,6 +145,7 @@ export function createSceneTuner({
       hemisphereIntensity: hemisphere.intensity,
       fogColor: source.fog?.color ?? source.background,
       fogDensity: source.fog?.density ?? 0,
+      movingFog: { ...DEFAULT_ATMOSPHERE },
     },
     shadows: {
       enabled: renderer.shadowMap.enabled,
@@ -205,6 +209,7 @@ export function createSceneTuner({
     // slab. Late selections lose; no stale promise can overwrite a newer one.
     const selected = await stone.select(next.stone);
     if (!selected || disposed || request !== appliedRevision) return false;
+    atmospherePass?.configure(next.atmosphere.movingFog);
     scene.background = new Color(next.atmosphere.background);
     scene.fog =
       !volume && next.atmosphere.fogDensity > 0

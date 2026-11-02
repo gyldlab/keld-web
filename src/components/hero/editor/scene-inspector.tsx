@@ -198,9 +198,26 @@ export function SceneInspector({
       );
       numeric(atmosphere, loaded.atmosphere, "hemisphereIntensity", 0, 2, 0.005, "Ambient light");
     }
-    tint(atmosphere, loaded.atmosphere, "fogColor", "Fog tint");
-    numeric(atmosphere, loaded.atmosphere, "fogDensity", 0, 0.05, 0.0005, "Fog density");
+    tint(atmosphere, loaded.atmosphere, "fogColor", "Distance fog tint");
+    numeric(atmosphere, loaded.atmosphere, "fogDensity", 0, 0.05, 0.0005, "Distance fog density");
     atmosphere.open();
+
+    if (!physical) {
+      const movingFog = gui.addFolder("Moving fog · atmosphere");
+      tint(movingFog, loaded.atmosphere.movingFog, "color", "Fog color");
+      numeric(movingFog, loaded.atmosphere.movingFog, "density", 0, 0.25, 0.005, "Fog thickness");
+      numeric(movingFog, loaded.atmosphere.movingFog, "speed", 0, 3, 0.05, "Drift speed");
+      numeric(
+        movingFog,
+        loaded.atmosphere.movingFog,
+        "cursorStrength",
+        0,
+        2,
+        0.05,
+        "Mouse response",
+      );
+      movingFog.open();
+    }
 
     const lights = gui.addFolder("Light sources");
     loaded.lights.forEach((item) => {

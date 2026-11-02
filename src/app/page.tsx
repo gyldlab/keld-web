@@ -49,6 +49,8 @@ const githubRepositories = [
 ] as const;
 
 export default function Home() {
+  // eslint-disable-next-line no-restricted-properties -- Next.js replaces this server-side build constant.
+  const development = process.env.NODE_ENV === "development";
   return (
     <div className="site-shell">
       <a className="skip-link" href="#main">
@@ -56,7 +58,7 @@ export default function Home() {
       </a>
       <main id="main">
         <section className="hero-section" aria-labelledby="hero-heading">
-          <CinematicHero />
+          <CinematicHero controls={development} />
           <div className="hero-scrim" aria-hidden="true" />
           <div className="hero-content">
             <h1 id="hero-heading">
@@ -176,6 +178,19 @@ export default function Home() {
       </main>
       <footer aria-label="Engineered and designed by GYLDLAB">
         <FooterBrandLockup />
+        {development && (
+          <nav
+            aria-label="Development tools"
+            className="mx-6 flex justify-end border-t border-white/10 py-6 min-[901px]:mx-14"
+          >
+            <Link
+              href="/lab/motion"
+              className="inline-flex min-h-11 items-center gap-3 text-[10px] font-semibold tracking-[0.16em] text-[#a8c4d5] uppercase hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#c6e8ff]"
+            >
+              Scene Lab <span aria-hidden="true">↗</span>
+            </Link>
+          </nav>
+        )}
       </footer>
     </div>
   );

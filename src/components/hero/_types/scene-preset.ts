@@ -22,6 +22,13 @@ export type MaterialTuning = {
   roughness: number;
 };
 
+export type MovingFogTuning = {
+  color: string;
+  cursorStrength: number;
+  density: number;
+  speed: number;
+};
+
 export type ScenePreset = {
   asset: string;
   atmosphere: {
@@ -31,6 +38,7 @@ export type ScenePreset = {
     fogColor: string;
     fogDensity: number;
     hemisphereIntensity: number;
+    movingFog: MovingFogTuning;
   };
   camera: {
     fov: number;
