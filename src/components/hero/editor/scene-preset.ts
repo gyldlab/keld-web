@@ -2,6 +2,8 @@ import type {
   LightTuning,
   MaterialTuning,
   ScenePreset,
+  SocialLogoTuning,
+  SocialTuning,
   Vec3,
 } from "@/components/hero/_types/scene-preset";
 /**
@@ -66,6 +68,49 @@ function material(input: unknown, field: string): MaterialTuning {
   };
 }
 
+function social(input: unknown, field: string): SocialLogoTuning {
+  const value = record(
+    input,
+    ["desktop", "enabled", "mobile", "position", "reveal", "rotation", "scale"],
+    field,
+  );
+  const reveal = record(
+    value.reveal,
+    ["enabled", "end", "lift", "start", "tilt"],
+    `${field}.reveal`,
+  );
+  const start = number(reveal.start, 0, 0.99, `${field}.reveal.start`);
+  const end = number(reveal.end, 0.01, 1, `${field}.reveal.end`);
+  if (end - start < 0.0099) fail(`${field}.reveal.end must follow start by at least 1%`);
+  if (!Array.isArray(value.rotation) || value.rotation.length !== 3) fail(`${field}.rotation`);
+  return {
+    desktop: boolean(value.desktop, `${field}.desktop`),
+    enabled: boolean(value.enabled, `${field}.enabled`),
+    mobile: boolean(value.mobile, `${field}.mobile`),
+    position: vector(value.position, `${field}.position`),
+    reveal: {
+      enabled: boolean(reveal.enabled, `${field}.reveal.enabled`),
+      end,
+      lift: number(reveal.lift, 0, 2, `${field}.reveal.lift`),
+      start,
+      tilt: number(reveal.tilt, -90, 90, `${field}.reveal.tilt`),
+    },
+    rotation: value.rotation.map((angle, index) =>
+      number(angle, -180, 180, `${field}.rotation.${index}`),
+    ) as Vec3,
+    scale: number(value.scale, 0.1, 4, `${field}.scale`),
+  };
+}
+
+function socials(input: unknown): SocialTuning {
+  const value = record(input, ["github", "x", "linkedin"], "socials");
+  return {
+    github: social(value.github, "socials.github"),
+    linkedin: social(value.linkedin, "socials.linkedin"),
+    x: social(value.x, "socials.x"),
+  };
+}
+
 /**
  * Reject malformed and cross-asset JSON before changing a live renderer.
  * No unrestricted object merge, eval, script execution or external URLs.
@@ -90,7 +135,13 @@ export function parsePreset(input: unknown, baseline: ScenePreset): ScenePreset 
     typeof input === "object" &&
     !Array.isArray(input) &&
     Object.prototype.hasOwnProperty.call(input, "stone");
-  const p = record(input, hasStone ? [...keys, "stone"] : keys, "preset");
+  const hasSocials =
+    !!input && typeof input === "object" && Object.prototype.hasOwnProperty.call(input, "socials");
+  const p = record(
+    input,
+    [...keys, ...(hasStone ? ["stone"] : []), ...(hasSocials ? ["socials"] : [])],
+    "preset",
+  );
   if (p.kind !== "keld.scene.tuning" || p.version !== 1 || p.asset !== baseline.asset) {
     fail("preset.version/asset");
   }
@@ -245,6 +296,7 @@ export function parsePreset(input: unknown, baseline: ScenePreset): ScenePreset 
       lower: vector(objects.lower, "objects.lower"),
       slab: vector(objects.slab, "objects.slab"),
     },
+    socials: socials(hasSocials ? p.socials : baseline.socials),
     lights,
   };
   if (

@@ -1,6 +1,7 @@
 import {
   Euler,
   Group,
+  MathUtils,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -9,11 +10,11 @@ import {
   Quaternion,
   SRGBColorSpace,
   Texture,
-  Vector3,
 } from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
-type SocialId = "github" | "x" | "linkedin";
+import type { SocialId, SocialTuning } from "@/components/hero/_types/scene-preset";
+import { createDefaultSocialTuning, SOCIAL_IDS } from "@/components/hero/social-settings";
 
 /** Physical plaques carry faithful flat brand artwork, with no altered silhouettes. */
 export async function createSocialPlinths(model: Object3D, signal: AbortSignal) {
@@ -21,8 +22,24 @@ export async function createSocialPlinths(model: Object3D, signal: AbortSignal) 
   if (!slab) throw new Error("The social plaques require the authored stone slab.");
   const group = new Group();
   group.name = "KELDSocialPlaques";
-  const anchors: Array<{ id: SocialId; node: Object3D; size: number }> = [];
-  const entries: Array<{ node: Group; rest: Vector3; orientation: Quaternion }> = [];
+  const anchors: Array<{
+    id: SocialId;
+    isInteractive: () => boolean;
+    node: Object3D;
+    occluders: Mesh[];
+    size: number;
+  }> = [];
+  const entries: Array<{ id: SocialId; node: Group; interactive: boolean }> = [];
+  const occluders: Mesh[] = [];
+  model.updateMatrixWorld(true);
+  // Using the ORIGINAL inverse preserves attachment after later slab offsets.
+  const authoredWorldToSlab = slab.matrixWorld.clone().invert();
+  const authoredRotationInverse = slab.getWorldQuaternion(new Quaternion()).invert();
+  const rotation = new Quaternion();
+  const euler = new Euler();
+  let settings = createDefaultSocialTuning();
+  let compact = matchMedia("(max-width: 900px), (max-aspect-ratio: 1/1)").matches;
+  let progress = 0;
   const textures: Texture[] = [];
   const faces: MeshBasicMaterial[] = [];
   const bodyGeometry = new RoundedBoxGeometry(0.5, 0.5, 0.09, 3, 0.035);
@@ -34,6 +51,34 @@ export async function createSocialPlinths(model: Object3D, signal: AbortSignal) 
     envMapIntensity: 0.65,
   });
   let disposed = false;
+  function updatePlacement() {
+    if (disposed) return;
+    for (const entry of entries) {
+      const value = settings[entry.id];
+      const t = value.reveal.enabled
+        ? MathUtils.clamp(
+            (progress - value.reveal.start) / (value.reveal.end - value.reveal.start),
+            0,
+            1,
+          )
+        : 1;
+      const eased = 1 - (1 - t) ** 3;
+      entry.node.visible = value.enabled && (compact ? value.mobile : value.desktop) && t > 0;
+      entry.interactive = entry.node.visible && eased >= 0.95;
+      entry.node.position.fromArray(value.position).applyMatrix4(authoredWorldToSlab);
+      entry.node.position.y += (1 - eased) * value.reveal.lift;
+      entry.node.scale.setScalar(value.scale * Math.max(0.001, eased));
+      euler.set(
+        MathUtils.degToRad(value.rotation[0]),
+        MathUtils.degToRad(value.rotation[1]),
+        MathUtils.degToRad(value.rotation[2]),
+      );
+      rotation.setFromEuler(euler);
+      entry.node.quaternion.copy(authoredRotationInverse).multiply(rotation);
+      entry.node.rotateX((1 - eased) * MathUtils.degToRad(value.reveal.tilt));
+    }
+    group.updateMatrixWorld(true);
+  }
   function dispose() {
     if (disposed) return;
     disposed = true;
@@ -68,19 +113,10 @@ export async function createSocialPlinths(model: Object3D, signal: AbortSignal) 
 
   try {
     // Sequential tiny local assets keep abort/disposal ownership unambiguous.
-    const ids: SocialId[] = ["github", "x", "linkedin"];
-    model.updateMatrixWorld(true);
-    const parentRotation = slab.getWorldQuaternion(new Quaternion()).invert();
-    const orientation = parentRotation
-      .clone()
-      .multiply(new Quaternion().setFromEuler(new Euler(-0.25, 0, 0)));
-    for (const [index, id] of ids.entries()) {
+    for (const id of SOCIAL_IDS) {
       const texture = await loadMark(id);
       const badge = new Group();
       badge.name = `SocialPlaque_${id}`;
-      const rest = slab.worldToLocal(new Vector3(3.1 + index * 0.8, 1.519, 2.5));
-      badge.position.copy(rest);
-      badge.quaternion.copy(orientation);
       const body = new Mesh(bodyGeometry, bodyMaterial);
       body.castShadow = true;
       body.receiveShadow = true;
@@ -101,27 +137,36 @@ export async function createSocialPlinths(model: Object3D, signal: AbortSignal) 
       face.name = `${id}_brand_face`;
       badge.add(face);
       group.add(badge);
-      anchors.push({ id, node: badge, size: 0.5 });
-      entries.push({ node: badge, rest, orientation: orientation.clone() });
+      const entry = { id, node: badge, interactive: false };
+      entries.push(entry);
+      anchors.push({
+        id,
+        isInteractive: () => entry.interactive,
+        node: badge,
+        occluders,
+        size: 0.5,
+      });
     }
     signal.throwIfAborted();
     slab.add(group);
-    group.updateMatrixWorld(true);
+    model.traverse((node) => {
+      if (node instanceof Mesh) occluders.push(node);
+    });
+    updatePlacement();
     return {
       group,
       anchors,
-      setReveal(progress: number) {
-        if (disposed) return;
-        entries.forEach(({ node, rest, orientation: rotation }, index) => {
-          const t = Math.max(0, Math.min(1, (progress - index * 0.09) / 0.82));
-          const eased = 1 - (1 - t) ** 3;
-          node.visible = t > 0;
-          node.position.copy(rest);
-          node.position.y += (1 - eased) * 0.18;
-          node.scale.setScalar(Math.max(0.001, eased));
-          node.quaternion.copy(rotation);
-          node.rotateX((1 - eased) * -0.12);
-        });
+      configure(next: SocialTuning) {
+        settings = structuredClone(next);
+        updatePlacement();
+      },
+      setCompact(next: boolean) {
+        compact = next;
+        updatePlacement();
+      },
+      setReveal(next: number) {
+        progress = MathUtils.clamp(next, 0, 1);
+        updatePlacement();
       },
       dispose,
     };

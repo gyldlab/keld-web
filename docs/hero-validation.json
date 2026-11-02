@@ -1,10 +1,24 @@
 {
-  "recordedAt": "2026-11-02T18:06:12.766Z",
-  "scope": "Local Chromium on Apple M4; compact viewports are emulated, not physical phones.",
+  "recordedAt": "2026-11-02T18:59:49.630Z",
+  "scope": "Local release-build Chromium on Apple M4. Compact viewports and DPR3 are emulated, not physical phones.",
+  "sourceBase": "0a96b906d19e42627814e9196ef6d99e3c22c79c",
+  "changes": [
+    "Cinematic foreground smoke clearing and perspective camera reveal",
+    "Per-social-logo editing, visibility, movement and preset controls",
+    "Full-resolution fog correction at depth boundaries and bounded compact DPR2",
+    "More visible ambient fog drift"
+  ],
+  "gates": {
+    "format": true,
+    "lint": true,
+    "typecheck": true,
+    "releaseBuild": true,
+    "productionAccess": true
+  },
   "suites": {
     "productionBrowser": {
       "origin": "http://127.0.0.1:3015",
-      "checkedAt": "2026-11-02T18:03:41.373Z",
+      "checkedAt": "2026-11-02T18:54:58.341Z",
       "errors": [],
       "checks": {
         "productionClientHasNoSceneLab": true,
@@ -20,14 +34,15 @@
       "initial": {
         "ready": "true",
         "renderMode": "raster",
-        "assemblyProgress": "0.095",
+        "assemblyProgress": "0.075",
         "reflectionCaptures": "1",
         "renderFrames": "11",
-        "fogTime": "0.217",
+        "fogTime": "0.167",
         "fogInteraction": "0.000",
         "sceneCaptures": "11",
         "fogResolution": "648x405",
         "fogQuality": "1",
+        "cameraPosition": "4.7944183228693635,3.0354283929901325,13.355937681875465",
         "atmosphereMotion": "running"
       },
       "graphics": {
@@ -41,12 +56,13 @@
           "renderMode": "raster",
           "assemblyProgress": "1",
           "reflectionCaptures": "1",
-          "renderFrames": "149",
-          "fogTime": "2.733",
+          "renderFrames": "153",
+          "fogTime": "2.750",
           "fogInteraction": "0.000",
-          "sceneCaptures": "135",
+          "sceneCaptures": "139",
           "fogResolution": "648x405",
           "fogQuality": "1",
+          "cameraPosition": "5.1999998,2.9000001,12.0349998",
           "atmosphereMotion": "running"
         },
         "after": {
@@ -54,12 +70,13 @@
           "renderMode": "raster",
           "assemblyProgress": "1",
           "reflectionCaptures": "1",
-          "renderFrames": "216",
-          "fogTime": "4.966",
+          "renderFrames": "220",
+          "fogTime": "4.983",
           "fogInteraction": "0.000",
-          "sceneCaptures": "135",
+          "sceneCaptures": "139",
           "fogResolution": "648x405",
           "fogQuality": "1",
+          "cameraPosition": "5.1999998,2.9000001,12.0349998",
           "atmosphereMotion": "running"
         },
         "measuredFps": 30.289330922242314
@@ -69,12 +86,13 @@
         "renderMode": "raster",
         "assemblyProgress": "1",
         "reflectionCaptures": "1",
-        "renderFrames": "229",
-        "fogTime": "5.400",
+        "renderFrames": "233",
+        "fogTime": "5.416",
         "fogInteraction": "0.878",
-        "sceneCaptures": "135",
+        "sceneCaptures": "139",
         "fogResolution": "648x405",
         "fogQuality": "1",
+        "cameraPosition": "5.1999998,2.9000001,12.0349998",
         "atmosphereMotion": "running"
       },
       "pointerRest": {
@@ -82,12 +100,13 @@
         "renderMode": "raster",
         "assemblyProgress": "1",
         "reflectionCaptures": "1",
-        "renderFrames": "308",
-        "fogTime": "8.033",
-        "fogInteraction": "0.040",
-        "sceneCaptures": "135",
+        "renderFrames": "313",
+        "fogTime": "8.083",
+        "fogInteraction": "0.038",
+        "sceneCaptures": "139",
         "fogResolution": "648x405",
         "fogQuality": "1",
+        "cameraPosition": "5.1999998,2.9000001,12.0349998",
         "atmosphereMotion": "running"
       },
       "socialLinks": [
@@ -146,12 +165,13 @@
           "renderMode": "raster",
           "assemblyProgress": "1",
           "reflectionCaptures": "1",
-          "renderFrames": "374",
-          "fogTime": "10.183",
+          "renderFrames": "378",
+          "fogTime": "10.200",
           "fogInteraction": "0.001",
-          "sceneCaptures": "139",
+          "sceneCaptures": "143",
           "fogResolution": "195x232",
           "fogQuality": "1",
+          "cameraPosition": "5.6999998,5.5,10.8000002",
           "atmosphereMotion": "running"
         },
         "after": {
@@ -159,15 +179,16 @@
           "renderMode": "raster",
           "assemblyProgress": "1",
           "reflectionCaptures": "1",
-          "renderFrames": "427",
-          "fogTime": "12.383",
+          "renderFrames": "431",
+          "fogTime": "12.416",
           "fogInteraction": "0.000",
-          "sceneCaptures": "139",
+          "sceneCaptures": "143",
           "fogResolution": "195x232",
           "fogQuality": "1",
+          "cameraPosition": "5.6999998,5.5,10.8000002",
           "atmosphereMotion": "running"
         },
-        "measuredFps": 23.960216998191683
+        "measuredFps": 23.981900452488688
       },
       "mobileLinks": [
         {
@@ -215,16 +236,198 @@
       ],
       "status": "pass"
     },
-    "developmentEditor": {
-      "checkedAt": "2026-11-02T17:57:52.027Z",
+    "socialControls": {
+      "checkedAt": "2026-11-02T18:54:13.375Z",
       "errors": [],
       "checks": {
-        "homepageEditorAndLink": true,
-        "fogControlsApplyAndSave": true,
-        "exportIncludesMovingFog": true,
-        "legacyPresetAccepted": true,
-        "/lab/motion": true,
-        "/lab/physical": true
+        "defaultsAndThreeLinks": true,
+        "independentPositionScaleRotation": true,
+        "deviceVisibilityHiddenFocusAndPerLogoReset": true,
+        "slabAttachmentSurvivesReconfiguration": true,
+        "entranceTimingDisableAndSeek": true,
+        "exportPersistenceLegacyAndInvalidImport": true,
+        "replayAvailable": true
+      },
+      "replayStart": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "0",
+        "reflectionCaptures": "1",
+        "renderFrames": "72",
+        "fogTime": "1.100",
+        "fogInteraction": "0.484",
+        "sceneCaptures": "72",
+        "fogResolution": "648x405",
+        "fogQuality": "1",
+        "cameraPosition": "4.785226363399689,3.038000109999999,13.38095623292679",
+        "atmosphereMotion": "running"
+      },
+      "status": "pass"
+    },
+    "cinematicReveal": {
+      "checkedAt": "2026-11-02T18:55:16.079Z",
+      "errors": [],
+      "frames": [
+        {
+          "progress": 0.05,
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "0.08",
+          "reflectionCaptures": "1",
+          "renderFrames": "11",
+          "fogTime": "0.183",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "11",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "cameraPosition": "4.796258555534774,3.034911656535913,13.350910190627719",
+          "atmosphereMotion": "running"
+        },
+        {
+          "progress": 0.22,
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "0.22",
+          "reflectionCaptures": "1",
+          "renderFrames": "30",
+          "fogTime": "0.500",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "30",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "cameraPosition": "4.856908645008971,3.0175130631189195,13.181542173508111",
+          "atmosphereMotion": "running"
+        },
+        {
+          "progress": 0.4,
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "0.4",
+          "reflectionCaptures": "1",
+          "renderFrames": "55",
+          "fogTime": "0.917",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "55",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "cameraPosition": "4.978297691886777,2.9802326660306826,12.818141842299484",
+          "atmosphereMotion": "running"
+        },
+        {
+          "progress": 0.65,
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "0.65",
+          "reflectionCaptures": "1",
+          "renderFrames": "89",
+          "fogTime": "1.483",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "89",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "cameraPosition": "5.133444831426969,2.9262322075368776,12.291083633107204",
+          "atmosphereMotion": "running"
+        },
+        {
+          "progress": 0.9,
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "0.905",
+          "reflectionCaptures": "1",
+          "renderFrames": "124",
+          "fogTime": "2.066",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "124",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "cameraPosition": "5.1999998,2.9000001,12.0349998",
+          "atmosphereMotion": "running"
+        },
+        {
+          "progress": 1,
+          "ready": "true",
+          "renderMode": "raster",
+          "assemblyProgress": "1",
+          "reflectionCaptures": "1",
+          "renderFrames": "140",
+          "fogTime": "2.350",
+          "fogInteraction": "0.000",
+          "sceneCaptures": "138",
+          "fogResolution": "648x405",
+          "fogQuality": "1",
+          "cameraPosition": "5.1999998,2.9000001,12.0349998",
+          "atmosphereMotion": "running"
+        }
+      ],
+      "status": "pass"
+    },
+    "denseDisplay": {
+      "checkedAt": "2026-11-02T18:58:33.396Z",
+      "scope": "Chromium desktop GPU with emulated DPR3; not a physical phone",
+      "checks": {
+        "denseDisplayKeepsCrispGeometryAndSceneCache": true,
+        "tabletPixelBudget": true
+      },
+      "mobile": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "1",
+        "reflectionCaptures": "1",
+        "renderFrames": "151",
+        "fogTime": "2.866",
+        "fogInteraction": "0.000",
+        "sceneCaptures": "137",
+        "fogResolution": "360x428",
+        "fogQuality": "1",
+        "cameraPosition": "5.6999998,5.5,10.8000002",
+        "atmosphereMotion": "running",
+        "cssWidth": 390,
+        "cssHeight": 464,
+        "width": 780,
+        "height": 928,
+        "dpr": 3,
+        "viewportWidth": 390
+      },
+      "after": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "1",
+        "reflectionCaptures": "1",
+        "renderFrames": "228",
+        "fogTime": "6.116",
+        "fogInteraction": "0.000",
+        "sceneCaptures": "137",
+        "fogResolution": "360x428",
+        "fogQuality": "1",
+        "cameraPosition": "5.6999998,5.5,10.8000002",
+        "atmosphereMotion": "running",
+        "cssWidth": 390,
+        "cssHeight": 464,
+        "width": 780,
+        "height": 928,
+        "dpr": 3,
+        "viewportWidth": 390
+      },
+      "measuredFps": 23.670458038733475,
+      "tablet": {
+        "ready": "true",
+        "renderMode": "raster",
+        "assemblyProgress": "1",
+        "reflectionCaptures": "1",
+        "renderFrames": "238",
+        "fogTime": "6.500",
+        "fogInteraction": "0.000",
+        "sceneCaptures": "138",
+        "fogResolution": "360x204",
+        "fogQuality": "1",
+        "cameraPosition": "5.6999998,5.5,10.8000002",
+        "atmosphereMotion": "running",
+        "cssWidth": 820,
+        "cssHeight": 464,
+        "width": 1628,
+        "height": 921,
+        "dpr": 3,
+        "viewportWidth": 820
       },
       "status": "pass"
     },
@@ -236,6 +439,27 @@
         "developmentEditorRestoredAfterProductionCheck": true
       },
       "status": "pass"
+    }
+  },
+  "ambientVisualComparison": {
+    "notes": "Fixed camera, settled geometry, idle cursor. Pixel differences use a two-channel-level threshold over approximately three seconds. Incidental screenshot-timing FPS counters are not used.",
+    "before": {
+      "checkedAt": "2026-11-02T18:35:18.511Z",
+      "meanPixelDifference": 1.754516651930128,
+      "changedPixelsPercent": 17.978006189213087,
+      "fogTimeBefore": "4.700",
+      "fogTimeAfter": "7.950",
+      "sceneCapturesBefore": "140",
+      "sceneCapturesAfter": "140"
+    },
+    "after": {
+      "checkedAt": "2026-11-02T18:36:49.421Z",
+      "meanPixelDifference": 3.3133712791042838,
+      "changedPixelsPercent": 32.91611405835544,
+      "fogTimeBefore": "4.700",
+      "fogTimeAfter": "7.983",
+      "sceneCapturesBefore": "141",
+      "sceneCapturesAfter": "141"
     }
   }
 }

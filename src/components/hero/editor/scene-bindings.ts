@@ -15,6 +15,7 @@ import type { GLTF } from "three/addons/loaders/GLTFLoader.js";
 import type { BokehPass } from "three/addons/postprocessing/BokehPass.js";
 import type { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
+import type { SocialTuning } from "@/components/hero/_types/scene-preset";
 import { type AtmospherePass, DEFAULT_ATMOSPHERE } from "@/components/hero/atmosphere-pass";
 import {
   copyPreset,
@@ -24,9 +25,11 @@ import {
 } from "@/components/hero/editor/scene-preset";
 import { createStoneTextures } from "@/components/hero/editor/stone-textures";
 import type { SceneConfig } from "@/components/hero/scene-runtime";
+import { createDefaultSocialTuning } from "@/components/hero/social-settings";
 
 type Bindings = {
   atmospherePass?: AtmospherePass;
+  socials?: { configure: (settings: SocialTuning) => void };
   source: SceneConfig;
   scene: Scene;
   model: GLTF;
@@ -105,6 +108,7 @@ function offsetParent(model: GLTF, objectName: string): Group {
 /** Holds direct Three.js bindings, separate from React/lil-gui/preset IO. */
 export function createSceneTuner({
   atmospherePass,
+  socials,
   source,
   scene,
   model,
@@ -174,6 +178,7 @@ export function createSceneTuner({
       sweepIntensity: source.finishSweep?.intensity ?? 0,
     },
     objects: { upper: [0, 0, 0], lower: [0, 0, 0], slab: [0, 0, 0] },
+    socials: createDefaultSocialTuning(),
     lights: source.lights.map((spec) => {
       const light = lights.find((item) => item.name === spec.name);
       if (!light) throw new Error(`Missing light: ${spec.name}`);
@@ -239,6 +244,7 @@ export function createSceneTuner({
       slabBase.y + next.objects.slab[1],
       slabBase.z + next.objects.slab[2],
     );
+    socials?.configure(next.socials);
 
     for (let i = 0; i < lights.length; i++) {
       const live = lights[i];

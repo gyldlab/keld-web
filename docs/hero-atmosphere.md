@@ -61,7 +61,7 @@ The plaques are children of the actual `BasaltMonolith` object, with world place
 2. Reconstruct the viewing ray from the camera and depth for each fog pixel. Intersect it with the fog box. Stop at the first opaque surface.
 3. March through that segment. Sample the density field, height falloff and soft volume boundaries. Account for the existing window spotlight and its shadow depth.
 4. Accumulate scattered light and attenuation. The extinction calculation uses exponential transmittance, commonly called the Beer–Lambert relationship.
-5. Enlarge the fog image using neighboring depth values to reduce leakage at object edges. Combine it as `scene * transmittance + scatteredLight`.
+5. Enlarge the fog image using neighboring depth values. Where those values cross an object boundary, integrate that full-resolution pixel's own ray and opaque depth. Do not borrow a background fog sample for a foreground pixel when interpolation has no compatible neighbor. Combine it as `scene * transmittance + scatteredLight`.
 6. Apply the existing output transform once. [Three.js color management](https://threejs.org/manual/pages/color-management.html) requires lighting calculations in its linear working color space. After display conversion, Three.js's FXAA pass (fast approximate anti-aliasing) smooths the final image's pixel edges, including edges introduced by atmosphere composition.
 
 After assembly, scene geometry and the camera are normally unchanged. The scene color and depth are reused. Only the fog and final image composition need to update. A camera, material, light, object or viewport change invalidates the cached scene. Environment reflection captures are not repeated for ordinary fog motion.
@@ -72,24 +72,38 @@ Caching has limits: future continuously moving objects must invalidate the scene
 
 Pointer coordinates are projected onto a plane through the fog at world `z = -3`. The disturbance acts within a soft spatial radius. It combines rotation around the pointer, limited directional movement and slight local clearing. Pointer movement is damped; velocity is clamped. After movement stops, its strength decays exponentially. Touch scrolling is not intercepted to imitate a mouse.
 
-The existing authored assembly is played once at a 0.7 time scale, taking approximately 2.29 seconds for the 1.6-second clip. The fog starts slightly denser and relaxes as assembly progresses. Social plaques reveal from roughly 55% through 95% of the clip, with a small stagger and gentle settling. The assembly does not loop; the ambient fog continues.
+The existing authored assembly is played once at a 0.7 time scale, taking approximately 2.29 seconds for the 1.6-second clip. A separate foreground plume initially obscures the mark. Its irregular opening expands rapidly from 12% to 58% of the timeline, while the density pattern moves outward. The plume fades fully by 82%; the usual rear fog remains. The foreground density has its own spatial mask and expanded march bounds, so it can actually appear in front of the mark rather than merely brighten the background.
+
+The camera starts slightly farther away with a restrained angular offset: 10% extra distance and about 3.7 degrees on desktop; 7% and about 2 degrees on compact layouts. Its smooth easing reaches the exact authored camera at 90% of the timeline. An edited camera takes priority, so the intro does not overwrite deliberate editor framing. Reduced-motion and data-saver starts use the final pose directly.
+
+| Beat                                | Timeline | Approximate playback time |
+| ----------------------------------- | -------- | ------------------------- |
+| Dense foreground smoke              | Opening  | First 0.3 seconds         |
+| Main smoke clearing completes       | 58%      | 1.33 seconds              |
+| Foreground smoke is fully gone      | 82%      | 1.87 seconds              |
+| Camera reaches its exact final pose | 90%      | 2.06 seconds              |
+| Last default social plaque finishes | 95%      | 2.17 seconds              |
+| Intro ends                          | 100%     | 2.29 seconds              |
+
+Social plaques reveal from roughly 55% through 95% of the clip, with a small stagger and gentle settling. The assembly does not loop; the ambient fog continues. Its normal drift is independent of the foreground reveal timing. The shared foreground shader exits early after the plume is gone, avoiding its extra texture sample during ongoing ambient motion.
 
 The pointer effect has no accumulated simulation history. This reduces memory and avoids stale motion trails after resize or camera changes. It also means the wake is localized: it is not a persistent fluid field advected across the whole scene.
 
 ## Production defaults and tuning
 
-| Setting                 | Default / bound                                                | Reason                                                          |
-| ----------------------- | -------------------------------------------------------------- | --------------------------------------------------------------- |
-| Fog color               | `#8eabc5`                                                      | Restrained cool atmosphere, consistent with the window light.   |
-| Density                 | `0.065`; editor range `0–0.25`                                 | Keeps the mark and copy legible while allowing thicker studies. |
-| Drift speed             | `1`; editor range `0–3`                                        | Adjusts the time scale of the density pattern.                  |
-| Mouse response          | `1`; editor range `0–2`                                        | Allows interaction to be reduced or disabled.                   |
-| Samples per ray         | 24 desktop, 16 compact                                         | Bounded work for a soft effect.                                 |
-| Fog width               | At most 840 pixels desktop, 360 compact, also bounded by scale | Avoids tracing at full display resolution.                      |
-| Main pixel ratio        | At most 1.5 desktop, 1.25 compact                              | Bounds large/high-density display work.                         |
-| Ambient cadence         | Target 30 frames/second desktop, 24 compact                    | Slow fog does not require a full-speed geometry render loop.    |
-| Slow-frame fallback     | 60% fog dimensions and 12 samples                              | Reduces work after sustained slow frames.                       |
-| Hidden/offscreen/paused | No scheduled animation frames                                  | Avoids unnecessary continuing work.                             |
+| Setting                 | Default / bound                                                           | Reason                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Fog color               | `#8eabc5`                                                                 | Restrained cool atmosphere, consistent with the window light.                               |
+| Density                 | `0.065`; editor range `0–0.25`                                            | Keeps the mark and copy legible while allowing thicker studies.                             |
+| Drift speed             | `1`; editor range `0–3`; base flow increased 3× in the polish revision    | Existing speed-1 drafts receive more visible movement without changing their saved setting. |
+| Mouse response          | `1`; editor range `0–2`                                                   | Allows interaction to be reduced or disabled.                                               |
+| Samples per ray         | 24 desktop, 16 compact                                                    | Bounded work for a soft effect.                                                             |
+| Fog width               | At most 840 pixels desktop, 360 compact, also bounded by scale            | Avoids tracing at full display resolution.                                                  |
+| Main pixel ratio        | At most 1.5 desktop, 2 compact; compact buffer at most 1.5 million pixels | Keeps small-screen geometry crisp while bounding tablet allocations.                        |
+| Geometry multisampling  | Up to 4 samples, bounded by device support                                | Improves silhouette coverage before composition.                                            |
+| Ambient cadence         | Target 30 frames/second desktop, 24 compact                               | Slow fog does not require a full-speed geometry render loop.                                |
+| Slow-frame fallback     | 60% fog dimensions and 12 samples                                         | Reduces work after sustained slow frames.                                                   |
+| Hidden/offscreen/paused | No scheduled animation frames                                             | Avoids unnecessary continuing work.                                                         |
 
 The first assembly targets the browser's normal animation cadence, up to 60 frames/second. Targets are scheduling limits, not guarantees for every device. Moving fog always has a graphics cost while visible. It would be inaccurate to describe this version as zero-rendering while idle.
 
@@ -109,19 +123,43 @@ The new **Moving fog · atmosphere** folder exposes fog color, thickness, drift 
 
 Changes in Scene Lab are browser drafts. Exporting a preset does not publish the site or change the repository defaults. The editor's top-level Hide button leaves the live scene active.
 
+### Individual social logo controls
+
+Each social plaque has its own settings. A visibility or transform edit applies to both its three-dimensional object and its projected HTML link. Hidden plaques must not leave invisible keyboard targets behind.
+
+| Control                      | What the editor changes                                                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enabled                      | Shows or hides that logo across all layouts.                                                                                                        |
+| Desktop / compact visibility | Selects the layouts where the logo appears. Compact uses the same width/aspect-ratio rule as the scene's mobile camera.                             |
+| Position X / Y / Z           | Places the logo across the scene, vertically and in depth. These are scene coordinates; the current camera angle determines their screen direction. |
+| Rotation X / Y / Z           | Tilts, turns and rolls the plaque in degrees.                                                                                                       |
+| Scale                        | Changes the complete plaque and artwork together, preserving artwork proportions.                                                                   |
+| Reveal timing                | Chooses when the plaque begins and finishes appearing within the existing assembly.                                                                 |
+| Settling motion              | Controls the approach into its final position; disabling the reveal makes the settled plaque available immediately.                                 |
+
+The authored slab transform is captured once for coordinate conversion. Moving the slab later carries its plaques with it; editing a plaque does not detach it or cancel the slab offset. The final link bounds follow the edited three-dimensional geometry. Hidden, offscreen or back-facing plaques do not expose clickable/focusable links. A center ray for each eligible plaque checks whether opaque visible geometry covers it. This is a bounded visibility approximation, not a pixel-perfect test of every visible part of the plaque.
+
+The **Preview animation** folder contains **Replay cinematic reveal**, **Pause assembly**, and **Seek animation (%)**. Seeking lets the author inspect entrance timing at a specific point. Pause assembly freezes the assembly timeline; the separate public Pause motion button stops the whole scene's animation. Each social folder also has its own reset. Settings are included in the browser draft and JSON import/export. Valid older presets without social settings receive the original composition's defaults.
+
 ## Ownership and lifecycle
 
-`atmosphere-pass.ts` owns its render targets, shaders and noise texture. `scene-motion.ts` owns the animation callback and input/preference listeners. `social-plinths.ts` owns shared plaque geometry, materials and brand textures. Disposal is idempotent. Async brand image loading checks cancellation and revokes temporary object URLs. Social meshes are removed before the original model disposal traverses its resources.
+`atmosphere-pass.ts` owns its render targets, shader materials and noise texture. `atmosphere-shaders.ts` shares the same volume integration between the coarse pass and full-resolution boundary correction. Both paths use the same uniforms and stable sampling grid. `scene-motion.ts` owns the animation callback and input/preference listeners. `social-plinths.ts` owns shared plaque geometry, materials and brand textures. Disposal is idempotent. Async brand image loading checks cancellation and revokes temporary object URLs. Social meshes are removed before the original model disposal traverses its resources.
+
+The boundary correction addresses the coarse fog reconstruction that caused uneven mobile silhouettes. More geometry samples and a higher compact pixel ratio improve the underlying solid edges as well. The resolved depth still represents one surface per pixel; this is not exact integration at every multisample coverage point. Higher resolution also consumes more graphics memory even though the solid scene is cached.
 
 The rendering failure path stops the loop, releases owned resources and presents Retry 3D. A retry creates a fresh renderer. The page keeps its normal textual content and navigation even if WebGL is unavailable.
 
 ## Verification record
 
-Final browser verification on Chromium with the Apple M4 Metal renderer measured approximately 30.3 ambient frames/second at 1440 × 900 and 24.0 at a 390-pixel viewport, over short 2.2-second observation windows. Those measurements are from the local desktop browser, including a compact viewport emulation; they are not a benchmark on a physical phone or a sustained thermal test.
+The polish revision was checked again in a release-build Chromium preview with the Apple M4 Metal renderer. It measured approximately 30.3 ambient frames/second at 1440 × 900 and 24.0 at a 390-pixel viewport, over short 2.2-second observation windows. Those measurements are from the local desktop browser, including compact viewport emulation; they are not a benchmark on a physical phone or a sustained thermal test.
 
-Verified in the development environment: homepage editor and Scene Lab link; live fog editing and browser persistence; JSON export containing moving fog; import of a valid older preset; both editor routes. The release build and the HTTP production gate passed, including all three social artwork assets and 404 responses for both lab routes.
+The development control check verified independent social position, scale and degree rotation; hidden/back-facing links leaving keyboard navigation; separate desktop/mobile visibility; per-logo reset; slab attachment after another edit; entrance timing, disable, seeking and replay; JSON export and reload; legacy import without social fields; and rejection of an invalid scale without applying it. The release build and the HTTP production gate passed, including all three social artwork assets and 404 responses for both lab routes.
 
-The production-browser check passed after the final edge-smoothing pass: the client has no Scene Lab; fog continues while scene/depth and reflection capture counts remain unchanged after assembly; cursor response rises and relaxes; social links are keyboard accessible; pause, offscreen state and a live reduced-motion change stop animation; 390- and 320-pixel layouts have no horizontal overflow. No page or console errors were reported in that normal interaction run. Desktop and compact screenshots were inspected; the social marks are visible and the mobile motion control does not cover them.
+The production-browser check passed with the new reveal and boundary correction: the client has no Scene Lab; fog continues while scene/depth and reflection capture counts remain unchanged after assembly; cursor response rises and relaxes; social links are keyboard accessible; pause, offscreen state and a live reduced-motion change stop animation; 390- and 320-pixel layouts have no horizontal overflow. No page or console errors were reported in that normal interaction run. Desktop, compact and reveal-stage screenshots were inspected. A separate progression check verified camera movement during the intro and an exact return to the authored final position.
+
+With the camera fixed and cursor idle, the before/after three-second visual comparison showed more fog change: mean absolute RGB difference increased from about 1.75 to 3.31 on the 0–255 channel scale, and the percentage of pixels changing by at least two channel levels increased from about 18% to 33%. This is a composition-specific visual comparison, not a universal measure of cinematic quality. The foreground plume is absent in these settled comparisons.
+
+An emulated device-pixel ratio of 3 at 390 CSS pixels verified a 780-pixel-wide solid-scene buffer and a separately capped 360-pixel-wide fog buffer. A portrait-tablet check confirmed that the compact solid buffer stays below the 1.5-million-pixel limit. The scene cache remained unchanged during ambient motion at the dense-display setting.
 
 A separate recovery check emulated data saver before application initialization, verified a settled static start and explicit resume, forced WebGL context loss, then verified Retry 3D returned to one live canvas. The development editor was reopened afterward. Formatting, lint, type checking, the standalone release build and the production access gate passed. The browser receipts are summarized in [hero-validation.json](hero-validation.json); detailed screenshots and scripts remain in the ignored local design workspace.
 

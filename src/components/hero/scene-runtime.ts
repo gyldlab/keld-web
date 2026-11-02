@@ -36,8 +36,9 @@ import { AtmospherePass } from "@/components/hero/atmosphere-pass";
 import { createDeckReflection } from "@/components/hero/deck-reflection";
 import type { SceneTuner } from "@/components/hero/editor/scene-bindings";
 import type { Vec3 } from "@/components/hero/editor/scene-preset";
-import { createAntialiasPass } from "@/components/hero/scene-antialias";
+import { createAntialiasPass, scenePixelRatio } from "@/components/hero/scene-antialias";
 import { HERO_ASSET_ROOT, HERO_COMPACT_QUERY } from "@/components/hero/scene-assets";
+import { frameSceneCamera } from "@/components/hero/scene-camera";
 import { readConfig, reflectionSignature } from "@/components/hero/scene-config";
 import { createSceneMotion } from "@/components/hero/scene-motion";
 import { disposeModel, projectSocialLinks } from "@/components/hero/scene-resources";
@@ -382,7 +383,7 @@ export async function createScene(
       scene,
       camera,
       windowLight instanceof SpotLight ? windowLight : undefined,
-      Math.min(2, renderer.capabilities.maxSamples),
+      Math.min(4, renderer.capabilities.maxSamples),
     );
     composer.addPass(atmosphere);
     // Mild depth-aware background separation, not decorative bokeh circles.
@@ -395,9 +396,7 @@ export async function createScene(
         maxblur: config.depthOfField.maxBlur,
       });
       defocus.enabled = config.depthOfField.maxBlur > 0;
-      // BokehPass's depth override treats transparent geometry as opaque.
-      // The mist is already in the color buffer; exclude its cards only from
-      // this depth pass so they do not create false focus planes at the edges.
+      // Exclude legacy transparent mist cards from BokehPass's opaque depth override.
       const renderDefocus = defocus.render.bind(defocus);
       defocus.render = (...args) => {
         const visibility = atmosphereMeshes.map((mesh) => mesh.visible);
@@ -434,6 +433,7 @@ export async function createScene(
       const { createSceneTuner } = await import("@/components/hero/editor/scene-bindings");
       tuner = createSceneTuner({
         atmospherePass: atmosphere,
+        socials,
         source: config,
         scene,
         model: gltf,
@@ -470,7 +470,14 @@ export async function createScene(
       mixer.setTime(seconds);
       const reveal = Math.max(0, Math.min(1, seconds / config.durationSeconds));
       atmosphere?.setReveal(reveal);
-      socials?.setReveal(Math.max(0, Math.min(1, (reveal - 0.55) / 0.4)));
+      socials?.setReveal(reveal);
+      if (!cameraEdited)
+        updateCamera(
+          Math.max(1, host.clientWidth),
+          Math.max(1, host.clientHeight),
+          matchMedia(HERO_COMPACT_QUERY).matches,
+          reveal,
+        );
       if (renderer) renderer.shadowMap.needsUpdate = true;
       if (finishLight && sweepSpec) {
         finishLight.position
@@ -501,15 +508,17 @@ export async function createScene(
         host.dataset.sceneCaptures = String(atmosphere?.sceneCaptures ?? 0);
         host.dataset.fogResolution = atmosphere?.getFogSize() ?? "none";
         host.dataset.fogQuality = String(atmosphere?.getQuality() ?? 0);
-        if (sceneChanged)
+        if (sceneChanged) {
+          host.dataset.cameraPosition = camera.position.toArray().join(",");
           projectSocialLinks(
             options.socialHost,
             socials?.anchors,
             camera,
             viewportWidth,
             viewportHeight,
-            elapsed / config.durationSeconds >= 0.8,
+            true,
           );
+        }
       } catch (error) {
         onFailure();
         dispose();
@@ -532,29 +541,22 @@ export async function createScene(
       draw();
     };
 
-    function updateCamera(width: number, height: number, mobile: boolean) {
+    function updateCamera(
+      width: number,
+      height: number,
+      mobile: boolean,
+      progress = elapsed / config.durationSeconds,
+    ) {
       const authored = mobile ? config.cameras.mobile : config.cameras.desktop;
       const spec = cameraEdited ? (tuner?.get().camera ?? authored) : authored;
-      camera.position.fromArray(spec.position);
-      camera.lookAt(...spec.target);
-      // Match object-fit:contain. Cover cropped the approved silhouette on
-      // portrait tablets and at 320px. Expand the field of view, never the mesh.
-      // https://threejs.org/docs/pages/PerspectiveCamera.html
-      const authoredAspect = mobile ? 4 / 5 : 16 / 9;
-      const containScale = Math.max(1, authoredAspect / (width / height));
-      camera.fov =
-        (2 * Math.atan(Math.tan((spec.fov * Math.PI) / 360) * containScale) * 180) / Math.PI;
-      camera.aspect = width / height;
-      camera.near = authored.near ?? 0.1;
-      camera.far = authored.far ?? 100;
-      camera.updateProjectionMatrix();
-      camera.updateMatrixWorld();
+      frameSceneCamera(camera, spec, authored, width, height, mobile, cameraEdited ? 1 : progress);
       if (orbit) {
         syncingOrbit = true;
         orbit.target.fromArray(spec.target);
         orbit.update();
         syncingOrbit = false;
       }
+      syncDepthOfField(width, height, mobile);
     }
 
     function syncDepthOfField(
@@ -608,8 +610,9 @@ export async function createScene(
       viewportHeight = height;
       const mobile = matchMedia(HERO_COMPACT_QUERY).matches;
       atmosphere?.setCompact(mobile);
+      socials?.setCompact(mobile);
       updateCamera(width, height, mobile);
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.25 : 1.5);
+      const pixelRatio = scenePixelRatio(width, height, mobile);
       renderer.setPixelRatio(pixelRatio);
       renderer.setSize(width, height, false);
       composer.setPixelRatio(pixelRatio);
@@ -737,6 +740,7 @@ export async function createScene(
         const height = mobile ? 1350 : 1080;
         const spec = config.cameras[mode];
         try {
+          sample(config.durationSeconds);
           // Export the actual WebGL lighting at the authored poster framing.
           // Reading immediately after rendering needs no persistent draw buffer.
           camera.position.fromArray(spec.position);
@@ -750,7 +754,6 @@ export async function createScene(
           composer.setPixelRatio(1);
           composer.setSize(width, height);
           syncDepthOfField(width, height, mobile, true);
-          sample(config.durationSeconds);
           atmosphere?.invalidate();
           composer.render();
           return renderer.domElement.toDataURL("image/png");

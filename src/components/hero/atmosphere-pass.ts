@@ -24,6 +24,11 @@ import {
 import { FullScreenQuad, Pass } from "three/addons/postprocessing/Pass.js";
 
 import type { MovingFogTuning } from "@/components/hero/_types/scene-preset";
+import {
+  atmosphereCompositeShader,
+  atmosphereFogShader,
+  atmosphereVertexShader,
+} from "@/components/hero/atmosphere-shaders";
 
 export const DEFAULT_ATMOSPHERE: Readonly<MovingFogTuning> = Object.freeze({
   color: "#8eabc5",
@@ -31,154 +36,6 @@ export const DEFAULT_ATMOSPHERE: Readonly<MovingFogTuning> = Object.freeze({
   density: 0.065,
   speed: 1,
 });
-
-// Design references and limits: docs/hero-atmosphere.md. No path tracing,
-// simulation download, temporal history, or per-frame scene reflection capture.
-const vertexShader = `
-  out vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = vec4(position.xy, 0.0, 1.0);
-  }
-`;
-
-const fogShader = `
-  precision highp sampler3D;
-  precision highp sampler2DShadow;
-  uniform sampler2D uDepth;
-  uniform sampler3D uNoise;
-  uniform sampler2DShadow uShadow;
-  uniform mat4 uInverseProjection;
-  uniform mat4 uCameraWorld;
-  uniform mat4 uShadowMatrix;
-  uniform vec3 uEye;
-  uniform vec3 uLightPosition;
-  uniform vec3 uLightDirection;
-  uniform vec3 uLightColor;
-  uniform vec3 uFogColor;
-  uniform vec3 uPointer;
-  uniform vec3 uPointerVelocity;
-  uniform vec2 uNearFar;
-  uniform float uPointerStrength;
-  uniform float uTime;
-  uniform float uReveal;
-  uniform float uDensity;
-  uniform float uLightIntensity;
-  uniform float uLightAngle;
-  uniform float uHasShadow;
-  uniform int uSteps;
-  in vec2 vUv;
-  out vec4 fragColor;
-
-  vec3 worldAt(float depth) {
-    vec4 p = uCameraWorld * uInverseProjection * vec4(vUv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-    return p.xyz / p.w;
-  }
-
-  float densityAt(vec3 p) {
-    // A soft, bounded volume behind the sculpture; no rectangular card edges.
-    float edges = smoothstep(-8.0, -5.0, p.x) * (1.0 - smoothstep(9.0, 12.0, p.x));
-    edges *= smoothstep(-12.0, -9.0, p.z) * (1.0 - smoothstep(0.0, 1.2, p.z));
-    float height = smoothstep(0.0, 1.3, p.y) * (1.0 - smoothstep(2.0, 6.5, p.y));
-    vec3 delta = p - uPointer;
-    float influence = exp(-dot(delta, delta) * 0.28) * uPointerStrength;
-    vec3 curl = vec3(-delta.y, delta.x, delta.z * 0.12);
-    vec3 flow = (curl * 0.4 + uPointerVelocity * 0.16) * influence;
-    vec3 q = (p + flow) * vec3(0.105, 0.18, 0.10);
-    q += vec3(-uTime * 0.007, uTime * 0.0018, uTime * 0.0024);
-    float broad = texture(uNoise, q).r;
-    float detail = texture(uNoise, q * 2.63 + vec3(0.31, 0.13, -uTime * 0.003)).r;
-    float wisps = smoothstep(0.30, 0.73, broad * 0.76 + detail * 0.24);
-    float revealVeil = mix(1.65, 1.0, uReveal);
-    return edges * height * wisps * uDensity * revealVeil * (1.0 - influence * 0.38);
-  }
-
-  float visibilityAt(vec3 p) {
-    if (uHasShadow < 0.5) return 1.0;
-    vec4 sc = uShadowMatrix * vec4(p, 1.0);
-    vec3 s = sc.xyz / sc.w;
-    if (min(s.x, s.y) < 0.0 || max(s.x, s.y) > 1.0 || s.z > 1.0 || s.z < 0.0) return 0.0;
-    return texture(uShadow, vec3(s.xy, s.z - 0.0008));
-  }
-
-  void main() {
-    float rawDepth = texture(uDepth, vUv).r;
-    vec3 surface = worldAt(rawDepth);
-    vec3 ray = normalize(surface - uEye);
-    float opaqueDistance = length(surface - uEye);
-    vec3 safeRay = mix(vec3(0.00001), ray, step(vec3(0.00001), abs(ray)));
-    vec3 a = (vec3(-8.0, 0.0, -12.0) - uEye) / safeRay;
-    vec3 b = (vec3(12.0, 6.5, 1.2) - uEye) / safeRay;
-    vec3 lo = min(a, b), hi = max(a, b);
-    float entry = max(0.0, max(lo.x, max(lo.y, lo.z)));
-    float end = min(opaqueDistance, min(hi.x, min(hi.y, hi.z)));
-    if (end <= entry) { fragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
-    float stepSize = (end - entry) / float(uSteps);
-    // Fixed sub-step offset: no temporal speckle, no accumulated ghost images.
-    float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-    float t = entry + stepSize * (0.25 + 0.5 * jitter);
-    float transmission = 1.0;
-    vec3 light = vec3(0.0);
-    for (int i = 0; i < 32; i++) {
-      if (i >= uSteps || t >= end || transmission < 0.02) break;
-      vec3 p = uEye + ray * t;
-      float density = densityAt(p);
-      float extinction = 1.0 - exp(-density * stepSize);
-      vec3 fromLight = p - uLightPosition;
-      float distanceSquared = max(dot(fromLight, fromLight), 10.0);
-      float cone = dot(normalize(fromLight), uLightDirection);
-      float beam = smoothstep(cos(uLightAngle), cos(uLightAngle * 0.65), cone);
-      float illumination = beam * visibilityAt(p) * min(2.5, uLightIntensity * 0.16 / distanceSquared);
-      vec3 scattering = uFogColor * 0.25 + uLightColor * illumination;
-      light += transmission * extinction * scattering;
-      transmission *= 1.0 - extinction;
-      t += stepSize;
-    }
-    // Premultiplied scattered radiance and Beer-Lambert transmittance.
-    fragColor = vec4(light, transmission);
-  }
-`;
-
-const compositeShader = `
-  uniform sampler2D uScene;
-  uniform sampler2D uFog;
-  uniform sampler2D uDepth;
-  uniform vec2 uFogSize;
-  uniform vec2 uNearFar;
-  in vec2 vUv;
-  out vec4 fragColor;
-  float viewDepth(float d) {
-    return (2.0 * uNearFar.x * uNearFar.y) /
-      (uNearFar.y + uNearFar.x - (d * 2.0 - 1.0) * (uNearFar.y - uNearFar.x));
-  }
-  void main() {
-    vec4 scene = texture(uScene, vUv);
-    float depth = viewDepth(texture(uDepth, vUv).r);
-    vec2 grid = vUv * uFogSize - 0.5;
-    vec2 base = floor(grid), f = fract(grid);
-    vec4 fog = vec4(0.0);
-    vec4 nearestFog = vec4(0.0, 0.0, 0.0, 1.0);
-    float nearestDifference = 1e6;
-    float weights = 0.0;
-    for (int y = 0; y < 2; y++) {
-      for (int x = 0; x < 2; x++) {
-        vec2 offset = vec2(float(x), float(y));
-        vec2 coord = (base + offset + 0.5) / uFogSize;
-        vec4 sampleFog = texture(uFog, coord);
-        vec2 bilinear = mix(1.0 - f, f, offset);
-        float sampleDepth = viewDepth(texture(uDepth, coord).r);
-        float difference = abs(sampleDepth - depth);
-        if (difference < nearestDifference) { nearestDifference = difference; nearestFog = sampleFog; }
-        float weight = bilinear.x * bilinear.y * exp(-difference * 12.0);
-        fog += sampleFog * weight;
-        weights += weight;
-      }
-    }
-    fog = weights > 0.0001 ? fog / weights : nearestFog;
-    // Composite in linear light, before the existing single OutputPass.
-    fragColor = vec4(scene.rgb * fog.a + fog.rgb, scene.a);
-  }
-`;
 
 /** Deterministic, tileable 32 KiB density field; no third-party bitmap download. */
 function createDensityTexture() {
@@ -264,8 +121,8 @@ export class AtmospherePass extends Pass {
     this.fogMaterial = new ShaderMaterial({
       name: "KELDDepthAwareAtmosphere",
       glslVersion: GLSL3,
-      vertexShader,
-      fragmentShader: fogShader,
+      vertexShader: atmosphereVertexShader,
+      fragmentShader: atmosphereFogShader,
       depthTest: false,
       depthWrite: false,
       blending: NoBlending,
@@ -278,6 +135,7 @@ export class AtmospherePass extends Pass {
         uCameraWorld: { value: camera.matrixWorld },
         uEye: { value: camera.position },
         uNearFar: { value: new Vector2(camera.near, camera.far) },
+        uFogSize: { value: new Vector2(1, 1) },
         uLightPosition: { value: new Vector3(5.73, 6, -12.199) },
         uLightDirection: { value: new Vector3() },
         uLightColor: { value: new Color("#c3ddfa") },
@@ -297,17 +155,15 @@ export class AtmospherePass extends Pass {
     this.compositeMaterial = new ShaderMaterial({
       name: "KELDAtmosphereComposite",
       glslVersion: GLSL3,
-      vertexShader,
-      fragmentShader: compositeShader,
+      vertexShader: atmosphereVertexShader,
+      fragmentShader: atmosphereCompositeShader,
       depthTest: false,
       depthWrite: false,
       blending: NoBlending,
       uniforms: {
+        ...this.fogMaterial.uniforms,
         uScene: { value: this.sceneTarget.texture },
         uFog: { value: this.fogTarget.texture },
-        uDepth: { value: this.sceneTarget.depthTexture },
-        uFogSize: { value: new Vector2(1, 1) },
-        uNearFar: { value: this.fogMaterial.uniforms.uNearFar.value },
       },
     });
     this.quad = new FullScreenQuad(this.fogMaterial);

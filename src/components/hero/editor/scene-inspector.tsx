@@ -5,6 +5,7 @@ import { type RefObject, useEffect, useRef, useState } from "react";
 import GUI from "lil-gui";
 
 import { parsePreset, type ScenePreset, type Vec3 } from "@/components/hero/editor/scene-preset";
+import { addSocialControls } from "@/components/hero/editor/social-controls";
 import { STONE_MATERIALS } from "@/components/hero/editor/stone-catalog";
 import { sceneDraftKey } from "@/components/hero/scene-assets";
 import type { SceneController } from "@/components/hero/scene-runtime";
@@ -292,6 +293,8 @@ export function SceneInspector({
     xyz(placement, "Lower piece", loaded.objects.lower, -3, 3, 0.01);
     xyz(placement, "Basalt slab", loaded.objects.slab, -3, 3, 0.01);
     placement.close();
+
+    if (!physical) addSocialControls(gui, loaded.socials, baseline.socials, commit, controller);
 
     if (physical) {
       const lens = gui.addFolder("Physical lens");

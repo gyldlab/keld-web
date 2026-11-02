@@ -75,9 +75,30 @@ export type ScenePreset = {
     opacity: number;
     radius: number;
   };
+  socials: SocialTuning;
   stone: StoneTuning;
   version: 1;
 };
+
+export type SocialId = "github" | "x" | "linkedin";
+
+export type SocialLogoTuning = {
+  desktop: boolean;
+  enabled: boolean;
+  mobile: boolean;
+  position: Vec3;
+  reveal: {
+    enabled: boolean;
+    end: number;
+    lift: number;
+    start: number;
+    tilt: number;
+  };
+  rotation: Vec3;
+  scale: number;
+};
+
+export type SocialTuning = Record<SocialId, SocialLogoTuning>;
 
 export type StoneTuning = {
   id: StoneMaterialId;
