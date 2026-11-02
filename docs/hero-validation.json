@@ -1,4 +1,87 @@
 {
+  "depthFlushRevision": {
+    "recordedAt": "2026-11-02T19:25:50.413Z",
+    "sourceBase": "1d85e1017ff49b66f3a7fe485650d211d7a53d69",
+    "scope": "Depth-flush replacement. Desktop Chromium on Apple M4; compact viewport and DPR3 are emulated.",
+    "changes": [
+      "Removed the left/right opening mask",
+      "Four finite world-space smoke volumes travel from near the camera past the mark along staggered X/Y/Z paths",
+      "Fixed view frame, animated local twists, late fade and exact ambient-bound restoration",
+      "Intro samples: 48 desktop / 32 compact / 20 degraded; ambient samples: 24 / 16 / 12",
+      "Replay captures edited camera even at zero progress"
+    ],
+    "gates": {
+      "format": true,
+      "lint": true,
+      "typecheck": true,
+      "releaseBuild": true,
+      "productionAccess": true
+    },
+    "fixedCamera": {
+      "checkedAt": "2026-11-02T19:22:17.179Z",
+      "status": "pass",
+      "checks": {
+        "fixedCameraAndAmbientTime": true,
+        "normalPerspectiveReplay": true
+      },
+      "errors": [],
+      "sampledProgress": [0, 12, 24, 36, 48, 60, 72, 90, 100],
+      "cameraPosition": "5.200099799999999,2.9000001000000006,12.0349998",
+      "ambientTime": "2.317",
+      "replayElapsedMs": 2298,
+      "replayFrames": 138,
+      "finalCamera": "5.1999998000000005,2.9000000999999993,12.034999800000001"
+    },
+    "compactIntro": {
+      "checkedAt": "2026-11-02T19:23:01.454Z",
+      "status": "pass",
+      "checks": {
+        "compactNativeDensityIntroAndReplay": true
+      },
+      "errors": [],
+      "sampledProgress": [0, 20, 36, 50, 72, 100],
+      "dpr": 3,
+      "solidBuffer": [780, 928],
+      "fogBuffer": "360x428",
+      "elapsedMs": 2307,
+      "measuredFps": 59.81794538361508,
+      "quality": "1"
+    },
+    "productionBrowser": {
+      "checkedAt": "2026-11-02T19:25:50.413Z",
+      "origin": "http://127.0.0.1:3015",
+      "status": "pass",
+      "checks": {
+        "productionClientHasNoSceneLab": true,
+        "cachedSceneAndAnimatedFog": true,
+        "pointerRespondsAndRelaxes": true,
+        "keyboardSocialLinks": true,
+        "pauseStopsRendering": true,
+        "offscreenStopsRendering": true,
+        "liveReducedMotionPreference": true,
+        "mobileLayoutAndFog": true,
+        "smallScreenNoOverflow": true
+      },
+      "errors": [],
+      "graphics": {
+        "webgl2": true,
+        "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+        "devicePixelRatio": 1
+      },
+      "desktopAmbientFps": 29.8372513562387,
+      "compactAmbientFps": 23.981900452488688,
+      "desktopSceneCaptures": ["136", "136"],
+      "desktopReflectionCaptures": ["1", "1"]
+    },
+    "visualReview": [
+      "Fixed-camera desktop images at nine timeline positions show projected scale changes, rotating folds, overlap and opaque-depth occlusion",
+      "Six compact DPR3 screenshots show smoke crossing the mark, rear folds and clear final silhouette"
+    ],
+    "limitations": [
+      "Art-directed density motion, not fluid simulation",
+      "No physical-phone, sustained thermal or Safari/Firefox qualification"
+    ]
+  },
   "recordedAt": "2026-11-02T18:59:49.630Z",
   "scope": "Local release-build Chromium on Apple M4. Compact viewports and DPR3 are emulated, not physical phones.",
   "sourceBase": "0a96b906d19e42627814e9196ef6d99e3c22c79c",

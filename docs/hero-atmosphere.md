@@ -2,7 +2,7 @@
 
 ## Result and design intent
 
-The hero combines the existing KELD assembly with a bounded volume of drifting fog, a soft mouse disturbance and three physical social plaques on the stone slab. The main mark remains the focal point. The fog provides depth behind it; the social marks appear late in the assembly and remain secondary.
+The hero combines the existing KELD assembly with a smoke flush that travels from near the camera into the scene, a bounded volume of drifting rear fog, a soft mouse disturbance and three physical social plaques on the stone slab. The main mark remains the focal point. Four overlapping smoke volumes turn around it in three dimensions; the social marks appear late in the assembly and remain secondary.
 
 The homepage has two deliberate modes. Development opens the existing Scene Lab, including controls for the new fog. Production renders the public composition without the editor or development links. Both lab routes return HTTP 404 in production. Browser drafts never activate production editing.
 
@@ -72,20 +72,25 @@ Caching has limits: future continuously moving objects must invalidate the scene
 
 Pointer coordinates are projected onto a plane through the fog at world `z = -3`. The disturbance acts within a soft spatial radius. It combines rotation around the pointer, limited directional movement and slight local clearing. Pointer movement is damped; velocity is clamped. After movement stops, its strength decays exponentially. Touch scrolling is not intercepted to imitate a mouse.
 
-The existing authored assembly is played once at a 0.7 time scale, taking approximately 2.29 seconds for the 1.6-second clip. A separate foreground plume initially obscures the mark. Its irregular opening expands rapidly from 12% to 58% of the timeline, while the density pattern moves outward. The plume fades fully by 82%; the usual rear fog remains. The foreground density has its own spatial mask and expanded march bounds, so it can actually appear in front of the mark rather than merely brighten the background.
+The existing authored assembly is played once at a 0.7 time scale, taking approximately 2.29 seconds for the 1.6-second clip. The foreground reveal uses four finite three-dimensional smoke volumes. Their centers start near the viewing position and travel past the mark, following staggered helical paths with horizontal and vertical movement. Each volume has longitudinal thickness, its own orientation and an irregular density pattern that twists along its depth. The previous left/right clearing mask has been removed.
+
+`fog-reveal-flow.ts` fixes a frame from the authored camera toward the logo, then updates the four transforms on the CPU. The normal camera's cinematic movement does not drag this frame around. Replay explicitly captures an edited camera, including when the author first seeks to zero and then changes the view. The shader transforms each world sample into each moving volume's coordinates. Consequently, the smoke's apparent scale, overlap and occlusion change even when the camera is held fixed. This is art-directed volume motion, not a fluid solver or smoke geometry colliding with the mark.
+
+The march bounds contain all four rotated volumes as well as the rear atmosphere. They expand in X, Y and Z, including above the compact camera, so the intro is not clipped by the old ambient box. Density fades near the eye and the ground. The foreground passes behind opaque geometry as it travels; a late fade from 70% to 90% removes residual wisps. At 90%, its weights reach zero and the bounds return exactly to the ambient box. No screen-space wipe is used to uncover the logo.
 
 The camera starts slightly farther away with a restrained angular offset: 10% extra distance and about 3.7 degrees on desktop; 7% and about 2 degrees on compact layouts. Its smooth easing reaches the exact authored camera at 90% of the timeline. An edited camera takes priority, so the intro does not overwrite deliberate editor framing. Reduced-motion and data-saver starts use the final pose directly.
 
-| Beat                                | Timeline | Approximate playback time |
-| ----------------------------------- | -------- | ------------------------- |
-| Dense foreground smoke              | Opening  | First 0.3 seconds         |
-| Main smoke clearing completes       | 58%      | 1.33 seconds              |
-| Foreground smoke is fully gone      | 82%      | 1.87 seconds              |
-| Camera reaches its exact final pose | 90%      | 2.06 seconds              |
-| Last default social plaque finishes | 95%      | 2.17 seconds              |
-| Intro ends                          | 100%     | 2.29 seconds              |
+| Beat                                  | Timeline | Approximate playback time |
+| ------------------------------------- | -------- | ------------------------- |
+| Near-camera smoke cover               | Opening  | First 0.3 seconds         |
+| Fast depth travel and rotating folds  | 12–60%   | 0.27–1.37 seconds         |
+| Last smoke volume finishes its travel | 73.4%    | 1.68 seconds              |
+| Foreground contribution reaches zero  | 90%      | 2.06 seconds              |
+| Camera reaches its exact final pose   | 90%      | 2.06 seconds              |
+| Last default social plaque finishes   | 95%      | 2.17 seconds              |
+| Intro ends                            | 100%     | 2.29 seconds              |
 
-Social plaques reveal from roughly 55% through 95% of the clip, with a small stagger and gentle settling. The assembly does not loop; the ambient fog continues. Its normal drift is independent of the foreground reveal timing. The shared foreground shader exits early after the plume is gone, avoiding its extra texture sample during ongoing ambient motion.
+Social plaques reveal from roughly 55% through 95% of the clip, with a small stagger and gentle settling. The assembly does not loop; the ambient fog continues. Its normal drift is independent of the foreground reveal timing. The shared shader exits before evaluating foreground volumes once they are gone. During the intro, samples outside the rear fog's spatial mask skip its noise lookups. Foreground noise lookups are also skipped outside each finite volume.
 
 The pointer effect has no accumulated simulation history. This reduces memory and avoids stale motion trails after resize or camera changes. It also means the wake is localized: it is not a persistent fluid field advected across the whole scene.
 
@@ -97,12 +102,12 @@ The pointer effect has no accumulated simulation history. This reduces memory an
 | Density                 | `0.065`; editor range `0–0.25`                                            | Keeps the mark and copy legible while allowing thicker studies.                             |
 | Drift speed             | `1`; editor range `0–3`; base flow increased 3× in the polish revision    | Existing speed-1 drafts receive more visible movement without changing their saved setting. |
 | Mouse response          | `1`; editor range `0–2`                                                   | Allows interaction to be reduced or disabled.                                               |
-| Samples per ray         | 24 desktop, 16 compact                                                    | Bounded work for a soft effect.                                                             |
+| Samples per ray         | Intro: 48 desktop, 32 compact. Ambient: 24 desktop, 16 compact            | Extra intro samples reduce grain while the near-camera volume spans a longer ray.           |
 | Fog width               | At most 840 pixels desktop, 360 compact, also bounded by scale            | Avoids tracing at full display resolution.                                                  |
 | Main pixel ratio        | At most 1.5 desktop, 2 compact; compact buffer at most 1.5 million pixels | Keeps small-screen geometry crisp while bounding tablet allocations.                        |
 | Geometry multisampling  | Up to 4 samples, bounded by device support                                | Improves silhouette coverage before composition.                                            |
 | Ambient cadence         | Target 30 frames/second desktop, 24 compact                               | Slow fog does not require a full-speed geometry render loop.                                |
-| Slow-frame fallback     | 60% fog dimensions and 12 samples                                         | Reduces work after sustained slow frames.                                                   |
+| Slow-frame fallback     | 60% fog dimensions; 20 intro samples, 12 ambient samples                  | Reduces work after sustained slow frames.                                                   |
 | Hidden/offscreen/paused | No scheduled animation frames                                             | Avoids unnecessary continuing work.                                                         |
 
 The first assembly targets the browser's normal animation cadence, up to 60 frames/second. Targets are scheduling limits, not guarantees for every device. Moving fog always has a graphics cost while visible. It would be inaccurate to describe this version as zero-rendering while idle.
@@ -143,13 +148,23 @@ The **Preview animation** folder contains **Replay cinematic reveal**, **Pause a
 
 ## Ownership and lifecycle
 
-`atmosphere-pass.ts` owns its render targets, shader materials and noise texture. `atmosphere-shaders.ts` shares the same volume integration between the coarse pass and full-resolution boundary correction. Both paths use the same uniforms and stable sampling grid. `scene-motion.ts` owns the animation callback and input/preference listeners. `social-plinths.ts` owns shared plaque geometry, materials and brand textures. Disposal is idempotent. Async brand image loading checks cancellation and revokes temporary object URLs. Social meshes are removed before the original model disposal traverses its resources.
+`atmosphere-pass.ts` owns its render targets, shader materials and noise texture. `fog-reveal-flow.ts` reuses four transforms, weights and bounds; it adds no GPU target or texture. `atmosphere-shaders.ts` shares the same volume integration between the coarse pass and full-resolution boundary correction. Both paths use the same uniform objects and stable sampling grid. `scene-motion.ts` owns the animation callback and input/preference listeners. `social-plinths.ts` owns shared plaque geometry, materials and brand textures. Disposal is idempotent. Async brand image loading checks cancellation and revokes temporary object URLs. Social meshes are removed before the original model disposal traverses its resources.
 
 The boundary correction addresses the coarse fog reconstruction that caused uneven mobile silhouettes. More geometry samples and a higher compact pixel ratio improve the underlying solid edges as well. The resolved depth still represents one surface per pixel; this is not exact integration at every multisample coverage point. Higher resolution also consumes more graphics memory even though the solid scene is cached.
 
 The rendering failure path stops the loop, releases owned resources and presents Retry 3D. A retry creates a fresh renderer. The page keeps its normal textual content and navigation even if WebGL is unavailable.
 
 ## Verification record
+
+### Depth-flush revision
+
+Nine desktop timeline samples were inspected with the camera fixed and ambient time frozen. The near-camera cover recedes, rotates into separate folds around the mark and crosses behind its opaque surfaces. The camera position was identical across all nine samples. A normal-camera replay also returned to the authored pose within floating-point tolerance and completed in approximately 2.30 seconds, with 138 rendered frames and no browser errors.
+
+Six compact intro samples were checked at an emulated 390-pixel viewport and device-pixel ratio of 3. The solid buffer remained 780 × 928 and the fog buffer 360 × 428. An uninterrupted replay measured approximately 59.8 frames/second over 2.31 seconds on the desktop GPU, with no adaptive quality reduction or browser errors. This is an emulation result, not a physical-phone performance claim. The screenshot review includes the smoke crossing the mark, the rear folds and the cleared final silhouette.
+
+The depth-flush release-build browser pass also verified continued ambient motion with unchanged solid-scene and reflection captures, cursor response and relaxation, keyboard social links, pause, offscreen stop, reduced-motion changes and narrow layouts. It measured about 29.8 desktop and 24.0 compact ambient frames/second in short observation windows. The production client had no Scene Lab and both lab routes returned 404. Formatting, lint, types, the standalone release build and the production access gate passed for this revision.
+
+### Previous atmosphere and editor polish
 
 The polish revision was checked again in a release-build Chromium preview with the Apple M4 Metal renderer. It measured approximately 30.3 ambient frames/second at 1440 × 900 and 24.0 at a 390-pixel viewport, over short 2.2-second observation windows. Those measurements are from the local desktop browser, including compact viewport emulation; they are not a benchmark on a physical phone or a sustained thermal test.
 

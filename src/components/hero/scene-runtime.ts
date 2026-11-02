@@ -175,8 +175,7 @@ export async function createScene(
     const atmosphereMeshes: Mesh[] = [];
     gltf.scene.traverse((object) => {
       if (object instanceof Mesh) {
-        // glTF nodes with multiple material primitives are Groups; their mesh
-        // children retain the source mesh names, not the animated node names.
+        // Multi-material glTF nodes are Groups; children keep mesh names, not node names.
         let ancestor: Object3D | null = object;
         let isLogo = false;
         while (ancestor) {
@@ -550,6 +549,7 @@ export async function createScene(
       const authored = mobile ? config.cameras.mobile : config.cameras.desktop;
       const spec = cameraEdited ? (tuner?.get().camera ?? authored) : authored;
       frameSceneCamera(camera, spec, authored, width, height, mobile, cameraEdited ? 1 : progress);
+      atmosphere?.setRevealView(spec.position);
       if (orbit) {
         syncingOrbit = true;
         orbit.target.fromArray(spec.target);
@@ -623,8 +623,7 @@ export async function createScene(
       draw();
     }
 
-    // Reduced motion/data saver begin settled; all other visitors get one short
-    // authored assembly followed by slow ambient fog, never a looping intro.
+    // Reduced motion/data saver start settled; otherwise play one assembly, then ambient fog.
     elapsed = motion.enabled ? 0 : config.durationSeconds;
     playing = motion.enabled;
     sample(elapsed);
@@ -696,6 +695,7 @@ export async function createScene(
       replay() {
         if (disposed) return;
         elapsed = 0;
+        atmosphere?.setRevealView(camera.position.toArray());
         sample(0);
         draw();
         play();

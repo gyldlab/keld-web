@@ -29,6 +29,7 @@ import {
   atmosphereFogShader,
   atmosphereVertexShader,
 } from "@/components/hero/atmosphere-shaders";
+import { FogRevealFlow } from "@/components/hero/fog-reveal-flow";
 
 export const DEFAULT_ATMOSPHERE: Readonly<MovingFogTuning> = Object.freeze({
   color: "#8eabc5",
@@ -88,6 +89,7 @@ export class AtmospherePass extends Pass {
   private sceneTarget: WebGLRenderTarget;
   private fogTarget: WebGLRenderTarget;
   private noise = createDensityTexture();
+  private revealFlow = new FogRevealFlow();
   private fogMaterial: ShaderMaterial;
   private compositeMaterial: ShaderMaterial;
   private quad: FullScreenQuad;
@@ -134,6 +136,10 @@ export class AtmospherePass extends Pass {
         uInverseProjection: { value: camera.projectionMatrixInverse },
         uCameraWorld: { value: camera.matrixWorld },
         uEye: { value: camera.position },
+        uRevealInverse: { value: this.revealFlow.inverseTransforms },
+        uRevealWeights: { value: this.revealFlow.weights },
+        uVolumeMin: { value: this.revealFlow.boundsMin },
+        uVolumeMax: { value: this.revealFlow.boundsMax },
         uNearFar: { value: new Vector2(camera.near, camera.far) },
         uFogSize: { value: new Vector2(1, 1) },
         uLightPosition: { value: new Vector3(5.73, 6, -12.199) },
@@ -180,6 +186,13 @@ export class AtmospherePass extends Pass {
   }
   setReveal(value: number) {
     this.fogMaterial.uniforms.uReveal.value = value;
+    this.revealFlow.update(value);
+    const intro = value < 0.9;
+    this.fogMaterial.uniforms.uSteps.value =
+      this.quality < 1 ? (intro ? 20 : 12) : this.compact ? (intro ? 32 : 16) : intro ? 48 : 24;
+  }
+  setRevealView(position: readonly number[]) {
+    this.revealFlow.setView(position);
   }
   setCompact(value: boolean) {
     if (value === this.compact) return;
@@ -237,7 +250,7 @@ export class AtmospherePass extends Pass {
       h = Math.max(1, Math.round(this.height * scale));
     this.fogTarget.setSize(w, h);
     this.compositeMaterial.uniforms.uFogSize.value.set(w, h);
-    this.fogMaterial.uniforms.uSteps.value = this.quality < 1 ? 12 : this.compact ? 16 : 24;
+    this.setReveal(this.fogMaterial.uniforms.uReveal.value);
     this.dirty = true;
   }
 

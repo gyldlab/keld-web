@@ -18,6 +18,10 @@ const integration = `
   uniform mat4 uCameraWorld;
   uniform mat4 uShadowMatrix;
   uniform vec3 uEye;
+  uniform mat4 uRevealInverse[4];
+  uniform vec4 uRevealWeights;
+  uniform vec3 uVolumeMin;
+  uniform vec3 uVolumeMax;
   uniform vec3 uLightPosition;
   uniform vec3 uLightDirection;
   uniform vec3 uLightColor;
@@ -44,35 +48,41 @@ const integration = `
     float edges = smoothstep(-8.0, -5.0, p.x) * (1.0 - smoothstep(9.0, 12.0, p.x));
     edges *= smoothstep(-12.0, -9.0, p.z) * (1.0 - smoothstep(0.0, 1.2, p.z));
     float height = smoothstep(0.0, 1.3, p.y) * (1.0 - smoothstep(2.0, 6.5, p.y));
-    vec3 delta = p - uPointer;
-    float influence = exp(-dot(delta, delta) * 0.28) * uPointerStrength;
-    vec3 curl = vec3(-delta.y, delta.x, delta.z * 0.12);
-    vec3 flow = (curl * 0.4 + uPointerVelocity * 0.16) * influence;
-    vec3 q = (p + flow) * vec3(0.105, 0.18, 0.10);
-    // Visible advection at speed=1, including previously saved editor drafts.
-    // Two differently moving scales keep the volume from sliding as one card.
-    q += vec3(-uTime * 0.021, uTime * 0.0054, uTime * 0.0072);
-    float broad = texture(uNoise, q).r;
-    float detail = texture(uNoise, q * 2.63 + vec3(0.31, 0.13, -uTime * 0.009)).r;
-    float wisps = smoothstep(0.30, 0.73, broad * 0.76 + detail * 0.24);
-    float revealVeil = mix(1.65, 1.0, uReveal);
-    float ambient = edges * height * wisps * uDensity * revealVeil * (1.0 - influence * 0.38);
-    if (uReveal >= 0.82) return ambient;
-    // A temporary foreground plume parts rapidly around the assembling mark.
-    // It reaches exactly zero, leaving the normal rear atmosphere untouched.
-    float opening = smoothstep(0.12, 0.58, uReveal);
-    float veil = 1.0 - smoothstep(0.38, 0.82, uReveal);
-    vec3 relative = p - vec3(2.55, 2.7, 1.6);
-    vec3 envelope = relative * vec3(0.27, 0.46, 0.56);
-    float plume = exp(-dot(envelope, envelope)) * smoothstep(0.55, 1.35, p.z);
-    vec3 rush = vec3(sign(relative.x) * opening * 2.2, opening * 0.65, opening * 0.8);
-    float plumeNoise = texture(uNoise, (p - rush) * vec3(0.24, 0.3, 0.26)).r;
-    float split = abs(relative.x + relative.y * 0.24) + (plumeNoise - 0.5) * 1.5;
-    float clearing = smoothstep(opening * 3.4 - 0.45, opening * 3.4 + 0.85, split);
-    clearing = mix(1.0, clearing, smoothstep(0.0, 0.18, opening));
-    float plumeWisps = smoothstep(0.24, 0.76, plumeNoise);
-    float foreground = plume * clearing * veil * (0.25 + plumeWisps * 1.4) * uDensity * 18.0;
-    return ambient + foreground;
+    float ambient = 0.0;
+    if (edges * height > 0.0) {
+      vec3 delta = p - uPointer;
+      float influence = exp(-dot(delta, delta) * 0.28) * uPointerStrength;
+      vec3 curl = vec3(-delta.y, delta.x, delta.z * 0.12);
+      vec3 flow = (curl * 0.4 + uPointerVelocity * 0.16) * influence;
+      vec3 q = (p + flow) * vec3(0.105, 0.18, 0.10);
+      // Two differently moving scales keep ambient fog from sliding as one card.
+      q += vec3(-uTime * 0.021, uTime * 0.0054, uTime * 0.0072);
+      float broad = texture(uNoise, q).r;
+      float detail = texture(uNoise, q * 2.63 + vec3(0.31, 0.13, -uTime * 0.009)).r;
+      float wisps = smoothstep(0.30, 0.73, broad * 0.76 + detail * 0.24);
+      float revealVeil = mix(1.65, 1.0, uReveal);
+      ambient = edges * height * wisps * uDensity * revealVeil * (1.0 - influence * 0.38);
+    }
+    if (uReveal >= 0.9) return ambient;
+    float smoke = 0.0;
+    for (int i = 0; i < 4; i++) {
+      // Actual moving 3D volumes, each with longitudinal thickness and roll.
+      vec3 local = (uRevealInverse[i] * vec4(p, 1.0)).xyz;
+      float envelope = max(0.0, 1.0 - dot(local, local));
+      if (envelope <= 0.0) continue;
+      float twist = local.z * 2.8 + uReveal * 1.3;
+      float c = cos(twist), s = sin(twist);
+      vec3 curled = vec3(c * local.x - s * local.y, s * local.x + c * local.y, local.z);
+      vec3 seed = vec3(float(i) * 0.23, 0.17, 0.31);
+      float billow = texture(uNoise, curled * 0.55 + seed).r;
+      vec3 distortion = vec3(billow * 0.45, 0.19, -uReveal * 0.25);
+      float strand = texture(uNoise, curled * 1.45 + seed + distortion).r;
+      float shape = smoothstep(0.36, 0.7, billow * 0.72 + strand * 0.28);
+      smoke += envelope * envelope * (0.04 + shape * 2.0) * uRevealWeights[i];
+    }
+    float nearEye = smoothstep(0.65, 1.4, distance(p, uEye));
+    float ground = smoothstep(0.75, 1.3, p.y);
+    return ambient + smoke * nearEye * ground * uDensity * 8.0;
   }
 
   float visibilityAt(vec3 p) {
@@ -88,9 +98,8 @@ const integration = `
     vec3 ray = normalize(surface - uEye);
     float opaqueDistance = length(surface - uEye);
     vec3 safeRay = mix(vec3(0.00001), ray, step(vec3(0.00001), abs(ray)));
-    vec3 a = (vec3(-8.0, 0.0, -12.0) - uEye) / safeRay;
-    float front = mix(4.8, 1.2, smoothstep(0.38, 0.82, uReveal));
-    vec3 b = (vec3(12.0, 6.5, front) - uEye) / safeRay;
+    vec3 a = (uVolumeMin - uEye) / safeRay;
+    vec3 b = (uVolumeMax - uEye) / safeRay;
     vec3 lo = min(a, b), hi = max(a, b);
     float entry = max(0.0, max(lo.x, max(lo.y, lo.z)));
     float end = min(opaqueDistance, min(hi.x, min(hi.y, hi.z)));
@@ -102,7 +111,7 @@ const integration = `
     float t = entry + stepSize * (0.25 + 0.5 * jitter);
     float transmission = 1.0;
     vec3 light = vec3(0.0);
-    for (int i = 0; i < 32; i++) {
+    for (int i = 0; i < 48; i++) {
       if (i >= uSteps || t >= end || transmission < 0.02) break;
       vec3 p = uEye + ray * t;
       float density = densityAt(p);
